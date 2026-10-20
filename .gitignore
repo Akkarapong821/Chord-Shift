@@ -1,0 +1,7 @@
+node_modules/
+dist/
+public/model/
+public/tesseract/
+.claude/
+eng.traineddata
+*-player-script.js

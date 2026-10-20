@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chord Shift — เปลี่ยนคีย์คอร์ดจากรูป</title>
+  <meta name="description" content="ใส่รูปคอร์ดเพลงแล้วเปลี่ยนคีย์ได้ทันที ฟรี ทำงานในเครื่อง ไม่อัปโหลดรูป" />
+  <meta name="theme-color" content="#12100e" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="./chords.html">🎸 Chord <span class="accent">Shift</span></a>
+      <a class="nav-link" href="./index.html?page=melody">Melody Tab →</a>
+    </header>
+
+    <!-- 1. Start ------------------------------------------------------------>
+    <section id="start-view">
+      <p class="lead">ใส่รูปคอร์ดเพลง แล้วแตะเลือกคีย์ที่อยากเล่น</p>
+      <p class="sub">ฟรี · ทำงานในเครื่องคุณ · ไม่อัปโหลดรูปขึ้นเน็ต</p>
+
+      <div id="dropzone" role="button" tabindex="0" aria-describedby="drop-hint">
+        <div class="drop-icon" aria-hidden="true">🖼️</div>
+        <div class="drop-title">แตะเพื่อเลือกรูป <span class="desktop-only">หรือลากรูปมาวาง</span></div>
+        <div class="drop-hint" id="drop-hint">
+          <span class="desktop-only">แคปหน้าจอแล้วกด <kbd>Ctrl</kbd>+<kbd>V</kbd> ก็ได้ · </span>เพลงยาวหลายหน้า เลือกหลายรูปพร้อมกันได้
+        </div>
+      </div>
+      <button id="camera-btn" class="ghost wide touch-only" type="button">📷 ถ่ายรูปกระดาษคอร์ด</button>
+      <input type="file" id="file-input" accept="image/*" multiple hidden />
+      <input type="file" id="camera-input" accept="image/*" capture="environment" hidden />
+
+      <ol class="steps">
+        <li><b>1</b> ใส่รูปคอร์ด</li>
+        <li><b>2</b> รอหาคอร์ดไม่กี่วินาที</li>
+        <li><b>3</b> แตะคีย์ที่ต้องการ</li>
+      </ol>
+
+      <section id="recent" hidden>
+        <h2>เพลงล่าสุด</h2>
+        <ul id="recent-list"></ul>
+      </section>
+    </section>
+
+    <!-- 2. Reading ------------------------------------------------------------>
+    <section id="progress-view" hidden>
+      <div class="scan" aria-hidden="true">
+        <img id="scan-img" alt="" />
+        <div class="scan-line"></div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <p id="progress-label" aria-live="polite">กำลังเตรียม…</p>
+      <button id="cancel-btn" class="ghost" type="button">ยกเลิก</button>
+    </section>
+
+    <div id="error-box" role="alert" hidden></div>
+
+    <!-- 3. Result ------------------------------------------------------------->
+    <section id="result-view" hidden>
+      <!-- Controls: a sticky sidebar on wide screens, stacked on phones -->
+      <aside class="side">
+        <div class="keybar" id="keybar">
+          <div class="keybar-main">
+            <button id="down-btn" class="step-btn" type="button" aria-label="ลดลงครึ่งเสียง" title="ลดลงครึ่งเสียง (−)">−</button>
+            <div class="key-now">
+              <span class="key-caption">เล่นในคีย์</span>
+              <span id="key-name" class="key-name">–</span>
+              <span id="shift-label" class="shift-label"></span>
+            </div>
+            <button id="up-btn" class="step-btn" type="button" aria-label="เพิ่มขึ้นครึ่งเสียง" title="เพิ่มขึ้นครึ่งเสียง (+)">+</button>
+          </div>
+          <div id="key-chips" class="key-chips" role="group" aria-label="เลือกคีย์"></div>
+        </div>
+
+        <div id="status-line" class="status-line"></div>
+
+        <div id="tuning-card" class="card tip" hidden>
+          <label class="switch-row">
+            <span>
+              <b>ไม่อยากจูนสายลง?</b>
+              <small id="tuning-note"></small>
+            </span>
+            <input type="checkbox" id="std-toggle" role="switch" />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <div id="capo-card" class="card capo-card" hidden>
+          <h3>🎯 เสียงเท่าเดิม แต่จับง่ายขึ้น</h3>
+          <p class="card-sub">ย้ายคาโป้แล้วจับคอร์ดชุดที่ง่ายกว่า (⭐ = คอร์ดเปิด จับง่าย)</p>
+          <div id="capo-chips" class="chip-row"></div>
+        </div>
+
+        <div id="diagram-card" class="card">
+          <button id="diagram-toggle" class="card-toggle" type="button" aria-expanded="true">
+            <span>✋ วิธีจับคอร์ดในเพลงนี้</span><span class="chev" aria-hidden="true">▾</span>
+          </button>
+          <div id="diagram-list" class="diagram-list"></div>
+        </div>
+
+        <details id="more" class="card">
+          <summary>ตัวเลือกเพิ่มเติม</summary>
+          <div class="more-grid">
+            <label class="field">
+              <span>คาโป้ที่คุณใส่</span>
+              <select id="capo-select"></select>
+            </label>
+            <label class="field">
+              <span>เขียนคอร์ดแบบ</span>
+              <select id="spelling-select">
+                <option value="auto">อัตโนมัติตามคีย์</option>
+                <option value="sharp">♯ ชาร์ป (C#, F#)</option>
+                <option value="flat">♭ แฟลต (Db, Gb)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>คีย์ต้นฉบับ</span>
+              <select id="orig-select"></select>
+            </label>
+            <label class="field">
+              <span>ต้นฉบับจูนสาย</span>
+              <select id="tuning-select"></select>
+            </label>
+            <label class="field check">
+              <input type="checkbox" id="highlight-toggle" />
+              <span>ไฮไลต์คอร์ดที่เปลี่ยนแล้ว (สีน้ำเงิน / สีเขียวบนรูปพื้นดำ)</span>
+            </label>
+          </div>
+        </details>
+
+      </aside>
+
+      <div class="main">
+        <div class="sheet-tools">
+          <p id="sheet-hint" class="sheet-hint">แตะคอร์ดในรูปเพื่อดูวิธีจับหรือแก้ไข</p>
+          <div class="sheet-tool-buttons">
+            <button id="split-btn" class="ghost" type="button" aria-pressed="true" hidden title="รูปที่แบ่งเป็นหลายคอลัมน์ แยกมาเรียงลงมาให้อ่านง่าย">▤ แยกคอลัมน์</button>
+            <button id="add-btn" class="ghost" type="button" aria-pressed="false">➕ เพิ่มคอร์ดที่ขาด</button>
+            <button id="compare-btn" class="ghost" type="button" aria-pressed="false">👁 ดูต้นฉบับ</button>
+          </div>
+        </div>
+        <div id="pages" class="pages"></div>
+
+        <div id="fretboard-card" class="card">
+          <button id="fretboard-toggle" class="card-toggle" type="button" aria-expanded="true">
+            <span>🎸 โน้ตในคีย์บนคอกีตาร์ <small id="fretboard-title" class="muted-inline"></small></span><span class="chev" aria-hidden="true">▾</span>
+          </button>
+          <div id="fretboard-body">
+            <div class="fb-controls">
+              <div class="seg" role="group" aria-label="ชนิดสเกล">
+                <button type="button" data-scale="full">สเกลเต็ม (7 โน้ต)</button>
+                <button type="button" data-scale="pent">เพนทาโทนิก (5 โน้ต)</button>
+              </div>
+              <div class="seg" role="group" aria-label="ป้ายบนโน้ต">
+                <button type="button" data-label="name">ชื่อโน้ต</button>
+                <button type="button" data-label="degree">ขั้น 1–7</button>
+              </div>
+            </div>
+            <div id="fretboard" class="fretboard"></div>
+            <p class="card-sub fb-legend"><span class="dot root"></span> โน้ตหลักของคีย์ <span class="dot"></span> โน้ตอื่นในสเกล · เลื่อนซ้าย-ขวาเพื่อดูช่องสูง</p>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button id="save-btn" class="primary" type="button">💾 บันทึกรูป</button>
+          <button id="share-btn" type="button" hidden>📤 แชร์</button>
+          <button id="print-btn" type="button">🖨️ พิมพ์ / PDF</button>
+          <button id="new-btn" type="button">🖼️ เพลงใหม่</button>
+        </div>
+        <p class="foot-note">ระบบอ่านคอร์ดอัตโนมัติอาจพลาดได้ ถ้าเห็นคอร์ดที่ยังเป็นสีเดิม (ไม่ได้ไฮไลต์) แตะ ➕ เพิ่มคอร์ดที่ขาด แล้วแตะคอร์ดนั้นในรูป</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Chord editor (bottom sheet) -->
+  <div id="sheet" class="sheet-backdrop" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head">
+        <h3 id="sheet-title">คอร์ด</h3>
+        <button id="sheet-close" class="icon-btn" type="button" aria-label="ปิด">✕</button>
+      </div>
+      <div class="sheet-content">
+        <div id="sheet-diagram" class="sheet-diagram"></div>
+        <div class="sheet-form">
+          <p id="sheet-play" class="sheet-play"></p>
+          <label class="field">
+            <span>ในรูปต้นฉบับเขียนว่า</span>
+            <input id="sheet-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
+          </label>
+          <p id="sheet-error" class="sheet-error" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button id="sheet-delete" class="danger" type="button">ลบ</button>
+        <button id="sheet-save" class="primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="print-head" class="print-only"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/chords/main.js"></script>
+</body>
+</html>

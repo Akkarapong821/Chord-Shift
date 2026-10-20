@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    if (new URLSearchParams(location.search).get('page') !== 'melody') {
+      location.replace('./chords.html');
+    }
+  </script>
+  <title>Melody Tab — แปลงเพลงเป็นแท็บกีตาร์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #12100e;
+      --panel: #1e1a16;
+      --panel-2: #27221d;
+      --text: #ece4d8;
+      --muted: #9b8f7e;
+      --accent: #e8a33d;
+      --accent-dim: #8a6323;
+      --border: #3a332b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Noto Sans Thai', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+    header { text-align: center; margin-bottom: 28px; }
+    header h1 { margin: 0; font-size: 28px; }
+    header h1 .accent { color: var(--accent); }
+    header p { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+
+    #dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    #dropzone:hover, #dropzone.dragover { border-color: var(--accent); background: var(--panel-2); }
+    #dropzone .big { font-size: 44px; margin-bottom: 8px; }
+    #dropzone .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    #file-input { display: none; }
+
+    .or-divider {
+      display: flex; align-items: center; gap: 14px;
+      color: var(--muted); font-size: 13px; margin: 16px 0;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .yt-row { display: flex; gap: 10px; }
+    .yt-row input {
+      flex: 1; font-family: inherit; font-size: 14px;
+      padding: 10px 14px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--panel); color: var(--text);
+      outline: none; transition: border-color .15s;
+    }
+    .yt-row input:focus { border-color: var(--accent); }
+    .yt-row input::placeholder { color: var(--muted); }
+
+    #progress-section { display: none; margin-top: 20px; }
+    .progress-track {
+      height: 10px; border-radius: 5px; background: var(--panel-2);
+      overflow: hidden; border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%; width: 0%; background: var(--accent);
+      transition: width .2s; border-radius: 5px;
+    }
+    #progress-label { color: var(--muted); font-size: 13px; margin-top: 8px; text-align: center; }
+
+    #result-section { display: none; margin-top: 24px; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; }
+    .control { display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
+    .control label { font-size: 13px; color: var(--muted); }
+    .control input[type=range] { accent-color: var(--accent); }
+    .control .val { font-size: 12px; color: var(--accent); }
+    .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+    .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    button {
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      padding: 9px 18px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--panel-2); color: var(--text); cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    button.primary:hover { background: #f0b355; }
+
+    #tab-output {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px; line-height: 1.5;
+      background: #0d0b09; border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; overflow-x: auto; white-space: pre;
+      color: #d8cfc0;
+    }
+    #tab-output .time-mark { color: var(--accent-dim); }
+    #summary { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+    #error-box {
+      display: none; margin-top: 16px; padding: 14px 18px; border-radius: 10px;
+      background: #3a1a1a; border: 1px solid #7a3030; color: #f0c0c0; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🎸 Melody <span class="accent">Tab</span></h1>
+      <p>อัปโหลดเพลง แล้วให้ AI ถอดเมโลดี้ออกมาเป็นแท็บกีตาร์ — ประมวลผลในเครื่องคุณทั้งหมด ไม่มีการอัปโหลดขึ้นเน็ต</p>
+      <p><a href="./chords.html" style="color: var(--accent); font-size: 14px;">มีรูปคอร์ดเพลง? เปลี่ยนคีย์ด้วย Chord Shift →</a></p>
+    </header>
+
+    <div id="dropzone">
+      <div class="big">🎵</div>
+      <div><strong>ลากไฟล์เพลงมาวางที่นี่</strong> หรือคลิกเพื่อเลือกไฟล์</div>
+      <div class="hint">รองรับ MP3, WAV, M4A, OGG — เพลงที่เมโลดี้เด่นชัดจะได้ผลดีที่สุด</div>
+      <input type="file" id="file-input" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" />
+    </div>
+
+    <div class="or-divider">หรือ</div>
+
+    <div class="yt-row">
+      <input type="url" id="yt-url" placeholder="วางลิงก์ YouTube เช่น https://youtu.be/…" />
+      <button class="primary" id="yt-btn">🎬 แกะโน้ตจาก YouTube</button>
+    </div>
+
+    <div id="progress-section">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div id="progress-label">กำลังเตรียม…</div>
+    </div>
+
+    <div id="error-box"></div>
+
+    <div id="result-section">
+      <div class="panel">
+        <div class="controls">
+          <div class="control">
+            <label for="sensitivity">ความไวการจับโน้ต</label>
+            <input type="range" id="sensitivity" min="1" max="9" value="5" />
+            <span class="val" id="sensitivity-val">ปานกลาง</span>
+          </div>
+          <div class="control">
+            <label for="min-len">ตัดโน้ตสั้นกว่า</label>
+            <input type="range" id="min-len" min="3" max="30" value="11" />
+            <span class="val" id="min-len-val">~130 ms</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="melody-only" checked />
+            เอาเฉพาะแนวเมโลดี้ (โน้ตเด่นสุด)
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <button class="primary" id="play-btn">▶ ฟังโน้ตที่ถอดได้</button>
+          <button id="copy-btn">คัดลอกแท็บ</button>
+          <button id="download-btn">ดาวน์โหลด .txt</button>
+          <button id="new-file-btn">เลือกเพลงใหม่</button>
+        </div>
+        <p id="summary"></p>
+        <div id="tab-output"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
