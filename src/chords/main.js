@@ -354,6 +354,7 @@ $('more').addEventListener('toggle', (e) => {
 // --- Render ------------------------------------------------------------------------
 
 function renderAll() {
+  renderSongTitle();
   renderKeybar();
   renderStatus();
   renderOptions();
@@ -361,6 +362,44 @@ function renderAll() {
   renderFretboard();
   drawPages();
 }
+
+function renderSongTitle() {
+  $('song-title').textContent = song.name;
+}
+
+function setTitleEditing(editing) {
+  const input = $('song-title-input');
+  input.hidden = !editing;
+  $('song-title').hidden = editing;
+  $('song-title-edit').hidden = editing;
+  $('song-title-save').hidden = !editing;
+  $('song-title-cancel').hidden = !editing;
+  if (editing) {
+    input.value = song.name;
+    input.focus();
+    input.select();
+  }
+}
+
+$('song-title-edit').addEventListener('click', () => setTitleEditing(true));
+$('song-title-cancel').addEventListener('click', () => setTitleEditing(false));
+$('song-title-save').addEventListener('click', () => {
+  const name = $('song-title-input').value.trim();
+  if (!name) {
+    $('song-title-input').focus();
+    toast('กรุณาใส่ชื่อเพลง');
+    return;
+  }
+  song.name = name;
+  renderSongTitle();
+  setTitleEditing(false);
+  persist(true);
+  toast('บันทึกชื่อเพลงแล้ว');
+});
+$('song-title-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('song-title-save').click();
+  if (e.key === 'Escape') $('song-title-cancel').click();
+});
 
 // Scale of the key being played, on the neck (named like the chord shapes,
 // counted from the capo).

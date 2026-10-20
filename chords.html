@@ -133,6 +133,13 @@
       </aside>
 
       <div class="main">
+        <div class="song-title-bar">
+          <h1 id="song-title" class="song-title"></h1>
+          <input id="song-title-input" class="song-title-input" type="text" maxlength="100" aria-label="ชื่อเพลง" hidden />
+          <button id="song-title-edit" class="icon-btn song-title-action" type="button" aria-label="แก้ชื่อเพลง" title="แก้ชื่อเพลง">✎</button>
+          <button id="song-title-save" class="icon-btn song-title-action" type="button" aria-label="บันทึกชื่อเพลง" title="บันทึก" hidden>✓</button>
+          <button id="song-title-cancel" class="icon-btn song-title-action" type="button" aria-label="ยกเลิกการแก้ชื่อ" title="ยกเลิก" hidden>✕</button>
+        </div>
         <div class="sheet-tools">
           <p id="sheet-hint" class="sheet-hint">แตะคอร์ดในรูปเพื่อดูวิธีจับหรือแก้ไข</p>
           <div class="sheet-tool-buttons">

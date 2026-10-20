@@ -257,6 +257,18 @@ details.card[open] > summary::after { transform: rotate(180deg); }
 .dot.root { background: var(--accent); border-color: var(--accent); }
 
 /* --- Pages ---------------------------------------------------------------- */
+.song-title-bar {
+  display: flex; align-items: center; gap: 6px; min-width: 0; margin: 8px 0 12px;
+}
+.song-title {
+  min-width: 0; overflow-wrap: anywhere; margin: 0; font-size: 21px; line-height: 1.35;
+}
+.song-title-input {
+  flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px;
+  background: var(--panel); outline: none;
+}
+.song-title-action { flex: none; min-width: 40px; width: 40px; min-height: 40px; padding: 0; }
+.song-title-action[hidden] { display: none; }
 .sheet-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 16px 0 8px; }
 .sheet-hint { margin: 0; font-size: 13px; color: var(--muted); }
 .sheet-hint.adding { color: var(--accent); font-weight: 600; }
@@ -334,12 +346,13 @@ details.card[open] > summary::after { transform: rotate(180deg); }
 #tuning-card { order: 3; }
 #diagram-card { order: 4; }
 #fretboard-card { order: 5; }
-.sheet-tools { order: 6; }
-#pages { order: 7; }
-#capo-card { order: 8; }
-#more { order: 9; }
-.toolbar { order: 10; }
-.foot-note { order: 11; }
+.song-title-bar { order: 6; }
+.sheet-tools { order: 7; }
+#pages { order: 8; }
+#capo-card { order: 9; }
+#more { order: 10; }
+.toolbar { order: 11; }
+.foot-note { order: 12; }
 
 @media (min-width: 1200px) {
   .wrap:has(#result-view:not([hidden])) { max-width: 1880px; }
@@ -358,6 +371,7 @@ details.card[open] > summary::after { transform: rotate(180deg); }
   .side .key-chips { flex-wrap: wrap; justify-content: center; overflow: visible; padding-top: 12px; row-gap: 12px; }
   .side .status-line { justify-content: flex-start; }
   .side .capo-card { margin-top: 0; }
+  .main .song-title-bar { margin-top: 0; }
   .main .sheet-tools { margin-top: 0; }
   .main #fretboard-card { margin-top: 16px; }
   .pages.multi { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; }
@@ -379,7 +393,7 @@ details.card[open] > summary::after { transform: rotate(180deg); }
   @page { margin: 10mm; }
   body { background: #fff; color: #000; }
   .wrap { max-width: none; padding: 0; }
-  .top, #start-view, #progress-view, #error-box, .keybar, .status-line, .card, .sheet-tools,
+  .top, #start-view, #progress-view, #error-box, .keybar, .status-line, .card, .song-title-bar, .sheet-tools,
   .toolbar, .foot-note, .sheet-backdrop, .toast, .page-badge { display: none !important; }
   .print-only { display: block; font: 600 14px system-ui, sans-serif; margin: 0 0 6mm; }
   .page { box-shadow: none; border-radius: 0; break-inside: avoid; outline: none !important; }
