@@ -170,6 +170,20 @@
       <input type="url" id="yt-url" placeholder="วางลิงก์ YouTube เช่น https://youtu.be/…" />
       <button class="primary" id="yt-btn">🎬 แกะโน้ตจาก YouTube</button>
     </div>
+    <div class="panel" style="margin-top: 12px;">
+      <div class="controls">
+        <div class="control">
+          <label for="yt-source">ดึงเสียง YouTube ผ่าน</label>
+          <select id="yt-source">
+            <option value="helper">ตัวช่วยบนเครื่องนี้</option>
+            <option value="server">เซิร์ฟเวอร์เว็บ</option>
+          </select>
+        </div>
+        <button id="check-helper-btn">ตรวจการเชื่อมต่อตัวช่วย</button>
+      </div>
+      <p class="note" id="yt-source-help"></p>
+      <p class="note" id="helper-status" role="status"></p>
+    </div>
 
     <div id="progress-section">
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>

@@ -5,6 +5,7 @@ import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime } from './audio-range.js';
+import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl } from './youtube-source.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -70,6 +71,27 @@ fileInput.addEventListener('change', () => {
 
 const ytUrl = $('yt-url');
 const ytBtn = $('yt-btn');
+const ytSource = $('yt-source');
+ytSource.value = defaultYouTubeSource(location.hostname);
+function updateYouTubeSource() {
+  const helper = ytSource.value === 'helper';
+  $('check-helper-btn').hidden = !helper;
+  $('yt-source-help').textContent = helper
+    ? 'เปิด start-youtube-helper.cmd ในโฟลเดอร์โปรเจกต์บนคอมเครื่องนี้ก่อนใช้งาน แล้วเปิดตัวช่วยค้างไว้ เสียงจะถูกดึงผ่านอินเทอร์เน็ตของเครื่องคุณ ไม่ผ่าน Render'
+    : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';
+  $('helper-status').textContent = '';
+}
+ytSource.addEventListener('change', updateYouTubeSource);
+updateYouTubeSource();
+$('check-helper-btn').addEventListener('click', async () => {
+  $('check-helper-btn').disabled = true;
+  $('helper-status').textContent = 'กำลังเชื่อมต่อตัวช่วย…';
+  try {
+    await checkYouTubeHelper();
+    $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · วางลิงก์ YouTube แล้วกดแกะโน้ตได้เลย';
+  } catch (error) { $('helper-status').textContent = error.message; }
+  finally { $('check-helper-btn').disabled = busy; }
+});
 
 ytBtn.addEventListener('click', handleYouTube);
 ytUrl.addEventListener('keydown', (e) => {
@@ -82,7 +104,8 @@ const YT_ERRORS = {
   'fetch-failed': 'ดึงเสียงจากวิดีโอนี้ไม่ได้ (อาจติดข้อจำกัดอายุ/ภูมิภาค หรือ YouTube เปลี่ยนระบบ) — ลองวิดีโออื่น',
   'upstream-forbidden': 'YouTube ปฏิเสธการดาวน์โหลดเสียงของวิดีโอนี้ — ลองใหม่ หรืออัปโหลดไฟล์เสียงจากเครื่องแทน',
   'video-unavailable': 'วิดีโอนี้ไม่พร้อมให้ดึงเสียง อาจเป็นวิดีโอส่วนตัวหรือต้องเข้าสู่ระบบ — ใช้ไฟล์เสียงจากเครื่องแทน',
-  'youtube-bot-check': 'YouTube บล็อก IP ของเซิร์ฟเวอร์เว็บว่าเป็นบอต — ใช้งานผ่าน local host หรืออัปโหลดไฟล์เสียงแทน',
+  'youtube-bot-check': 'YouTube ขอการยืนยันว่าไม่ใช่บอตจากเซิร์ฟเวอร์เว็บ — เปลี่ยนเป็นตัวช่วยบนเครื่องนี้ หรืออัปโหลดไฟล์เสียงแทน',
+  'helper-busy': 'ตัวช่วยกำลังดึงเสียงให้แท็บอื่นอยู่ — รอให้เสร็จแล้วลองใหม่',
   'download-timeout': 'ดึงเสียงจาก YouTube นานเกินไป — ตรวจการเชื่อมต่อแล้วลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
   'incomplete-audio': 'ได้รับเสียงจาก YouTube ไม่ครบ — กรุณาลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
   'invalid-audio': 'YouTube ไม่ได้ส่งไฟล์เสียงที่รองรับกลับมา — ลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
@@ -105,9 +128,16 @@ async function handleYouTube() {
   setProgress(0, 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
 
   try {
-    const res = await fetch(`/api/youtube?url=${encodeURIComponent(url)}`);
+    if (ytSource.value === 'helper') {
+      await checkYouTubeHelper();
+      $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · กำลังดึงเสียงผ่านเครื่องนี้';
+    }
+    const res = await fetch(youtubeRequestUrl(url, ytSource.value), { signal: AbortSignal.timeout(75000) });
     if (!res.ok) {
       const code = (await res.text()).trim();
+      if (code === 'youtube-bot-check' && ytSource.value === 'helper') {
+        throw new Error('YouTube ขอการยืนยันว่าไม่ใช่บอตจากเครือข่ายเครื่องนี้ด้วย — อัปโหลดไฟล์เสียงจากเครื่องแทน');
+      }
       throw new Error(YT_ERRORS[code] || `ดึงเสียงไม่สำเร็จ (${res.status})`);
     }
     if (!res.headers.get('Content-Type')?.startsWith('audio/') || !res.body) {
@@ -134,12 +164,18 @@ async function handleYouTube() {
     const type = res.headers.get('Content-Type') || 'audio/webm';
     const ext = type.includes('mp4') ? 'm4a' : 'webm';
     const file = new File([new Blob(chunks, { type })], `${title}.${ext}`, { type });
+    if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงผ่านตัวช่วยสำเร็จ';
     progressSection.style.display = 'none';
     await processFile(file);
   } catch (err) {
     console.error(err);
     progressSection.style.display = 'none';
-    showError(err instanceof TypeError
+    if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงยังไม่สำเร็จ · ดูข้อความด้านล่าง';
+    showError(err.name === 'TimeoutError' || err.name === 'AbortError'
+      ? YT_ERRORS['download-timeout']
+      : err instanceof TypeError && ytSource.value === 'helper'
+      ? 'การเชื่อมต่อตัวช่วยขาดหาย — เปิดตัวช่วยค้างไว้และอนุญาตการเข้าถึงเครือข่ายในเครื่อง แล้วลองใหม่'
+      : err instanceof TypeError
       ? 'การเชื่อมต่อกับเซิร์ฟเวอร์ขาดหายระหว่างดึงเสียง — ตรวจว่าเซิร์ฟเวอร์ยังทำงาน แล้วลองใหม่ หรืออัปโหลดไฟล์เสียงแทน'
       : err.message);
   } finally {
@@ -161,6 +197,8 @@ function setBusy(on) {
   busy = on;
   fileInput.disabled = on;
   ytBtn.disabled = on;
+  ytSource.disabled = on;
+  $('check-helper-btn').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
     $(id).disabled = on || !decodedAudio;

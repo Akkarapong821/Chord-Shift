@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
+    "helper": "node server/helper.js",
     "setup:youtube": "node scripts/setup-youtube.mjs",
     "test": "node --test \"src/*.test.js\" \"src/chords/*.test.js\" \"server/*.test.js\""
   },
