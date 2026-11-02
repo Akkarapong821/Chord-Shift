@@ -40,6 +40,8 @@ export function downloadAudio(videoId, signal, { spawnProcess = spawn } = {}) {
       signal.removeEventListener('abort', abort);
       if (failure) { reject(failure); return; }
       if (code !== 0 || !received) {
+        const diagnostic = errorText.replace(/\x1b\[[0-9;]*m/g, '').replace(/https?:\/\/\S+/gi, '[url]').trim().slice(-600);
+        if (diagnostic) console.warn('[youtube] downloader detail:', diagnostic);
         const errorCode = /does not pass filter.*duration.*(?:>|greater than)\s*900|duration.*(?:>|greater than)\s*900\s*seconds/i.test(errorText) ? 'video-too-long'
           : /larger than max-filesize/i.test(errorText) ? 'audio-too-large'
           : /403|Forbidden/i.test(errorText) ? 'upstream-forbidden' : 'fetch-failed';
