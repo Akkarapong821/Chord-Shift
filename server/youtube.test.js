@@ -39,6 +39,41 @@ test('successful endpoint returns complete audio with Thai title and actual byte
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), fixture);
 });
 
+test('download is attempted when YouTube metadata reports login required', async (t) => {
+  let downloaded = false;
+  const response = await request(t, {
+    getInnertube: async () => ({ getBasicInfo: async () => ({
+      ...info,
+      playability_status: { status: 'LOGIN_REQUIRED', reason: 'Sign in required' },
+    }) }),
+    download: async () => { downloaded = true; return fixture; },
+  });
+  assert.equal(downloaded, true);
+  assert.equal(response.status, 200);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), fixture);
+});
+
+test('fallback preserves explicit downloader errors', async (t) => {
+  const response = await request(t, {
+    getInnertube: async () => ({ getBasicInfo: async () => ({
+      ...info,
+      playability_status: { status: 'LOGIN_REQUIRED' },
+    }) }),
+    download: async () => { throw Object.assign(new Error('too long'), { code: 'video-too-long', status: 413 }); },
+  });
+  assert.equal(response.status, 413);
+  assert.equal(await response.text(), 'video-too-long');
+});
+
+test('metadata lookup failure falls back to download and uses the video ID as title', async (t) => {
+  const response = await request(t, {
+    getInnertube: async () => { throw new Error('metadata unavailable'); },
+    download: async () => fixture,
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-video-title'), 'z164pDlYtOk');
+});
+
 test('invalid URL never starts downloading', async (t) => {
   const response = await request(t, { download: () => assert.fail('must not download') }, 'not-youtube');
   assert.equal(response.status, 400);

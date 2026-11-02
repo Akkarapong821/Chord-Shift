@@ -15,6 +15,7 @@ export function downloadAudio(videoId, signal, { spawnProcess = spawn } = {}) {
       '--ignore-config', '--no-playlist', '--no-progress', '--no-cache-dir',
       '--js-runtimes', `node:${process.execPath}`, '--socket-timeout', '15',
       '--retries', '1', '--fragment-retries', '1', '--abort-on-unavailable-fragments',
+      '--match-filter', 'duration <= 900',
       '--max-filesize', String(MAX_AUDIO_BYTES), '-f', 'bestaudio[ext=m4a]',
       '-o', '-', '--', `https://www.youtube.com/watch?v=${videoId}`,
     ], { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -39,9 +40,11 @@ export function downloadAudio(videoId, signal, { spawnProcess = spawn } = {}) {
       signal.removeEventListener('abort', abort);
       if (failure) { reject(failure); return; }
       if (code !== 0 || !received) {
-        const errorCode = /larger than max-filesize/i.test(errorText) ? 'audio-too-large'
+        const errorCode = /does not pass filter.*duration.*(?:>|greater than)\s*900|duration.*(?:>|greater than)\s*900\s*seconds/i.test(errorText) ? 'video-too-long'
+          : /larger than max-filesize/i.test(errorText) ? 'audio-too-large'
           : /403|Forbidden/i.test(errorText) ? 'upstream-forbidden' : 'fetch-failed';
-        reject(Object.assign(new Error(errorCode), { code: errorCode, status: errorCode === 'audio-too-large' ? 413 : 502 }));
+        const status = ['audio-too-large', 'video-too-long'].includes(errorCode) ? 413 : 502;
+        reject(Object.assign(new Error(errorCode), { code: errorCode, status }));
         return;
       }
       const audio = Buffer.concat(chunks, received);

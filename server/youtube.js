@@ -58,16 +58,30 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, t
     res.on('close', cancel);
     const timeout = setTimeout(cancel, timeoutMs);
     try {
-      const yt = await abortable(getInnertube(), controller.signal);
-      const info = await abortable(yt.getBasicInfo(videoId, { client: YT_CLIENT }), controller.signal);
+      let info = null;
+      try {
+        const yt = await abortable(getInnertube(), controller.signal);
+        info = await abortable(yt.getBasicInfo(videoId, { client: YT_CLIENT }), controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        console.warn('[youtube] metadata-unavailable');
+      }
       if (controller.signal.aborted) throw fail('download-timeout', 504);
-      if (Number(info.basic_info.duration) > MAX_VIDEO_SECONDS) throw fail('video-too-long', 413);
-      if (info.basic_info.is_live) throw fail('live-video', 400);
-      if (info.playability_status?.status !== 'OK') throw fail('video-unavailable');
+      if (Number(info?.basic_info?.duration) > MAX_VIDEO_SECONDS) throw fail('video-too-long', 413);
+      if (info?.basic_info?.is_live) throw fail('live-video', 400);
 
       // Wait for the downloader to finish before committing audio headers.
       // A failed or partial transfer must remain a readable HTTP error.
-      const audio = await abortable(download(videoId, controller.signal), controller.signal);
+      let audio;
+      try {
+        audio = await abortable(download(videoId, controller.signal), controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        if (!error.code && info?.playability_status?.status && info.playability_status.status !== 'OK') {
+          throw fail('video-unavailable');
+        }
+        throw error;
+      }
       if (controller.signal.aborted) throw fail('download-timeout', 504);
       if (!audio.length) throw fail('incomplete-audio');
       if (audio.length > MAX_AUDIO_BYTES) throw fail('audio-too-large', 413);
@@ -75,7 +89,7 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, t
         'Content-Type': 'audio/mp4',
         'Content-Length': audio.length,
         'Cache-Control': 'no-store',
-        'X-Video-Title': encodeURIComponent(info.basic_info.title || 'youtube'),
+        'X-Video-Title': encodeURIComponent(info?.basic_info?.title || videoId),
       });
       res.end(audio);
     } catch (error) {
