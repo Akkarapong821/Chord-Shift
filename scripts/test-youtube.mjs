@@ -1,22 +1,15 @@
-// Quick sanity check that youtubei.js can fetch an audio stream on this
-// machine (YouTube frequently changes things that break extractor libraries).
-// Tries several InnerTube clients — some return direct URLs that skip the
-// broken decipher path.
-import { Innertube } from 'youtubei.js';
-
-const yt = await Innertube.create();
-
-for (const client of ['IOS', 'ANDROID', 'TV', 'WEB_EMBEDDED', 'YTMUSIC']) {
-  try {
-    const info = await yt.getBasicInfo('jNQXAC9IVRw', { client });
-    const stream = await info.download({ type: 'audio', quality: 'best', client });
-    let bytes = 0;
-    for await (const chunk of stream) {
-      bytes += chunk.length;
-      if (bytes > 50000) break; // enough to prove it streams
-    }
-    console.log(`${client}: OK — ${info.basic_info.title}, streamed ${bytes} bytes`);
-  } catch (err) {
-    console.log(`${client}: FAIL — ${err.message}`);
-  }
+// Exercise the actual app download path. Start npm run dev first.
+const url = process.argv[2] || 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+try {
+  const response = await fetch(`http://127.0.0.1:5173/api/youtube?url=${encodeURIComponent(url)}`, {
+    signal: AbortSignal.timeout(70000),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  if (!response.headers.get('content-type')?.startsWith('audio/')) throw new Error('Expected audio response');
+  const bytes = (await response.arrayBuffer()).byteLength;
+  if (!bytes || bytes !== Number(response.headers.get('content-length'))) throw new Error('Incomplete audio');
+  console.log(`OK — ${decodeURIComponent(response.headers.get('x-video-title'))}, ${bytes} bytes`);
+} catch (error) {
+  console.error(`FAIL — ${error.message}`);
+  process.exitCode = 1;
 }

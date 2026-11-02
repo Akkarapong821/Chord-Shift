@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test \"src/chords/*.test.js\""
+    "setup:youtube": "node scripts/setup-youtube.mjs",
+    "test": "node --test \"src/*.test.js\" \"src/chords/*.test.js\" \"server/*.test.js\""
   },
   "dependencies": {
     "@spotify/basic-pitch": "^1.0.1",

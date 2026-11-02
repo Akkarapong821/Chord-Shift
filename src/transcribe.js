@@ -27,7 +27,7 @@ let modelPromise = null;
 
 // Run the basic-pitch model. Returns raw activation matrices so note
 // extraction can be re-run cheaply when the user changes settings.
-export async function transcribe(audioBuffer, onProgress) {
+export async function transcribe(audio, onProgress) {
   if (!modelPromise) {
     modelPromise = Promise.resolve(new BasicPitch('model/model.json'));
   }
@@ -37,7 +37,7 @@ export async function transcribe(audioBuffer, onProgress) {
   const onsets = [];
   const contours = [];
   await basicPitch.evaluateModel(
-    audioBuffer,
+    audio, // AudioBuffer or a cropped Float32Array at MODEL_SAMPLE_RATE.
     (f, o, c) => {
       frames.push(...f);
       onsets.push(...o);

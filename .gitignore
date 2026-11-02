@@ -5,3 +5,4 @@ public/tesseract/
 .claude/
 eng.traineddata
 *-player-script.js
+.tools/

@@ -7,23 +7,21 @@
 
 export const TUNING = [40, 45, 50, 55, 59, 64]; // E2 A2 D3 G3 B3 E4, string 0 = low E
 export const STRING_NAMES = ['E', 'A', 'D', 'G', 'B', 'e'];
-const MAX_FRET = 15;
 const MIN_PITCH = TUNING[0];
-const MAX_PITCH = TUNING[5] + MAX_FRET;
 
-function candidatesFor(pitch) {
+function candidatesFor(pitch, maxFret) {
   const out = [];
   for (let s = 0; s < 6; s++) {
     const fret = pitch - TUNING[s];
-    if (fret >= 0 && fret <= MAX_FRET) out.push({ string: s, fret });
+    if (fret >= 0 && fret <= maxFret) out.push({ string: s, fret });
   }
   return out;
 }
 
-function intoRange(pitch) {
+function intoRange(pitch, maxFret) {
   let p = Math.round(pitch);
   while (p < MIN_PITCH) p += 12;
-  while (p > MAX_PITCH) p -= 12;
+  while (p > TUNING[5] + maxFret) p -= 12;
   return p;
 }
 
@@ -37,10 +35,15 @@ function transitionCost(prev, cur) {
   return Math.abs(prev.fret - cur.fret) * 1.0 + Math.abs(prev.string - cur.string) * 0.3;
 }
 
-export function assignFrets(notes) {
+export function assignFrets(notes, { maxFret = 15, octaveShift = true } = {}) {
+  if (!Number.isInteger(maxFret) || maxFret < 0 || maxFret > 24) {
+    throw new RangeError('maxFret must be an integer from 0 to 24');
+  }
+  notes = notes.filter((n) => Number.isFinite(n.pitchMidi) && (octaveShift ||
+    (Math.round(n.pitchMidi) >= MIN_PITCH && Math.round(n.pitchMidi) <= TUNING[5] + maxFret)));
   if (notes.length === 0) return [];
 
-  const candidates = notes.map((n) => candidatesFor(intoRange(n.pitchMidi)));
+  const candidates = notes.map((n) => candidatesFor(intoRange(n.pitchMidi, maxFret), maxFret));
 
   // Viterbi: cost[i][j] = min total cost ending at candidate j of note i.
   let costs = candidates[0].map(positionCost);
@@ -74,7 +77,7 @@ export function assignFrets(notes) {
 
   return notes.map((n, i) => ({
     ...n,
-    pitchMidi: intoRange(n.pitchMidi),
+    pitchMidi: intoRange(n.pitchMidi, maxFret),
     ...candidates[i][picks[i]],
   }));
 }
