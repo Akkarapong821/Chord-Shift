@@ -112,6 +112,16 @@ Workflow ที่ `.github/workflows/deploy-pages.yml` จะ build และ d
 2. ใน repository ไปที่ **Settings → Pages** แล้วเลือก **GitHub Actions** เป็น Build and deployment source
 3. รอ workflow `Deploy to GitHub Pages` ทำงานสำเร็จ จากนั้นเปิด URL ที่แสดงใน deployment
 
-หน้าอัปโหลดไฟล์เพลงและ Chord Shift ทำงานบน GitHub Pages ได้ ส่วนการแกะเสียงจาก YouTube ใช้ endpoint ฝั่ง Vite dev server ซึ่ง GitHub Pages ไม่มีให้ จึงใช้ฟีเจอร์นั้นบน deployment ไม่ได้
+GitHub Pages เป็น static hosting จึงใช้ upload เพลงจากเครื่องและ Chord Shift ได้ แต่ไม่มี Node.js server สำหรับ `/api/youtube` ทำให้การแกะเสียงจาก YouTube ใช้ไม่ได้
+
+## Deploy เว็บที่รองรับ YouTube
+
+ใช้ Render เพื่อรันทั้งหน้าเว็บและ YouTube API บน service เดียวกัน:
+
+1. Push repository นี้ไป GitHub แล้วเข้า [Render](https://render.com/) และเลือก **New → Blueprint**
+2. เชื่อม repository `Chord-Shift` และเลือก branch `main`; Render จะอ่าน `render.yaml`
+3. กด **Apply** แล้วรอ build/deploy เสร็จ จากนั้นเปิด URL `.onrender.com` ที่ Render ให้มา
+
+Blueprint จะติดตั้ง yt-dlp พร้อมตรวจ SHA-256, build เว็บ และเริ่ม Node server ที่เสิร์ฟทั้งหน้าเว็บกับ `/api/youtube` บน origin เดียวกัน แผน Free อาจ sleep เมื่อไม่มีคนใช้ จึงอาจต้องรอให้ service ตื่นก่อนคำขอแรก
 
 ทดสอบ: `npm test` (เทสต์ทฤษฎีดนตรี ตัวคัดแยกคอร์ดด้วยผล OCR จริงจากรูปตัวอย่าง และตรวจตารางนิ้วทุกคอร์ด 12 คีย์ × 19 ชนิดคอร์ด)
