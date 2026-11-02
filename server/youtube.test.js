@@ -99,6 +99,14 @@ test('download failure returns readable error without stale audio length or brok
   assert.equal(await response.text(), 'upstream-forbidden');
 });
 
+test('YouTube bot-check responses use a distinct actionable error', async (t) => {
+  const response = await request(t, {
+    download: async () => { throw Object.assign(new Error('blocked'), { code: 'youtube-bot-check', status: 502 }); },
+  });
+  assert.equal(response.status, 502);
+  assert.equal(await response.text(), 'youtube-bot-check');
+});
+
 test('empty download is rejected', async (t) => {
   const response = await request(t, { download: async () => Buffer.alloc(0) });
   assert.equal(response.status, 502);
@@ -153,4 +161,7 @@ test('missing downloader and non-audio output produce explicit errors', async ()
   await assert.rejects(downloadAudio('z164pDlYtOk', signal, { spawnProcess: fakeSpawn((child) => {
     child.stdout.write('this is not an audio file'); child.emit('close', 0);
   }) }), { code: 'invalid-audio' });
+  await assert.rejects(downloadAudio('z164pDlYtOk', signal, { spawnProcess: fakeSpawn((child) => {
+    child.stderr.write("ERROR: Sign in to confirm you're not a bot"); child.emit('close', 1);
+  }) }), { code: 'youtube-bot-check', status: 502 });
 });

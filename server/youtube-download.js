@@ -42,7 +42,8 @@ export function downloadAudio(videoId, signal, { spawnProcess = spawn } = {}) {
       if (code !== 0 || !received) {
         const diagnostic = errorText.replace(/\x1b\[[0-9;]*m/g, '').replace(/https?:\/\/\S+/gi, '[url]').trim().slice(-600);
         if (diagnostic) console.warn('[youtube] downloader detail:', diagnostic);
-        const errorCode = /does not pass filter.*duration.*(?:>|greater than)\s*900|duration.*(?:>|greater than)\s*900\s*seconds/i.test(errorText) ? 'video-too-long'
+        const errorCode = /sign in to confirm.{0,30}not a bot|confirm you(?:'|’)re not a bot/i.test(errorText) ? 'youtube-bot-check'
+          : /does not pass filter.*duration.*(?:>|greater than)\s*900|duration.*(?:>|greater than)\s*900\s*seconds/i.test(errorText) ? 'video-too-long'
           : /larger than max-filesize/i.test(errorText) ? 'audio-too-large'
           : /403|Forbidden/i.test(errorText) ? 'upstream-forbidden' : 'fetch-failed';
         const status = ['audio-too-large', 'video-too-long'].includes(errorCode) ? 413 : 502;
