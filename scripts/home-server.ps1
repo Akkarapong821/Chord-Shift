@@ -1,4 +1,4 @@
-param([switch]$SmokeTest, [switch]$TestYouTube, [switch]$ResumeSession, [switch]$StartAndOpen)
+param([switch]$SmokeTest, [switch]$TestYouTube, [switch]$ResumeSession, [switch]$StartServer)
 $ErrorActionPreference = 'Stop'
 $projectDir = Split-Path -Parent $PSScriptRoot
 $nodePath = (Get-Command node -ErrorAction Stop).Source
@@ -8,7 +8,7 @@ $script:localServerUrl = 'http://127.0.0.1:39842'
 $logDir = Join-Path $projectDir '.tools'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $script:windowMutex = $null
-$script:openEvent = $null
+$script:startEvent = $null
 $controllerPidFile = Join-Path $logDir 'home-controller.pid'
 if (-not $SmokeTest) {
     $hasher = [System.Security.Cryptography.SHA256]::Create()
@@ -18,10 +18,10 @@ if (-not $SmokeTest) {
     try { $ownsWindow = $script:windowMutex.WaitOne(0) }
     catch [System.Threading.AbandonedMutexException] { $ownsWindow = $true }
     if (-not $ownsWindow) {
-        if ($StartAndOpen) {
-            # Ask the existing controller to start (if stopped) and open its
-            # fixed GitHub website. Repeated launches never spawn extra servers.
-            $existingEvent = [System.Threading.EventWaitHandle]::OpenExisting('Local\MelodyTabHomeOpen-' + $rootHash)
+        if ($StartServer) {
+            # Reuse the existing controller and start its server if stopped.
+            # Browser navigation always requires clicking Open website.
+            $existingEvent = [System.Threading.EventWaitHandle]::OpenExisting('Local\MelodyTabHomeStart-' + $rootHash)
             try { [void]$existingEvent.Set() } finally { $existingEvent.Dispose() }
         }
         # A second launch brings back this project's existing control window.
@@ -41,7 +41,7 @@ if (-not $SmokeTest) {
         $script:windowMutex.Dispose()
         exit
     }
-    $script:openEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, ('Local\MelodyTabHomeOpen-' + $rootHash))
+    $script:startEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, ('Local\MelodyTabHomeStart-' + $rootHash))
     [IO.File]::WriteAllText($controllerPidFile, [string]$PID)
 }
 
@@ -185,23 +185,22 @@ $stopButton.Add_Click({
 })
 $openButton.Add_Click({ Start-Process $script:websiteUrl })
 $form.Add_FormClosing({ Stop-HomeServer })
-function Open-ReadyWebsite {
+function Start-ReadyServer {
     try {
         Start-HomeServer
         Show-ServerOn
-        Start-Process $script:websiteUrl
     } catch {
-        $statusLabel.Text = 'Could not open Melody Tab - ' + $_.Exception.Message
+        $statusLabel.Text = 'Could not start Melody Tab - ' + $_.Exception.Message
         $startButton.Enabled = -not ($script:webProcess -and -not $script:webProcess.HasExited)
     }
 }
 $openTimer = New-Object System.Windows.Forms.Timer
 $openTimer.Interval = 250
 $openTimer.Add_Tick({
-    if ($script:openEvent.WaitOne(0)) { Open-ReadyWebsite }
+    if ($script:startEvent.WaitOne(0)) { Start-ReadyServer }
 })
 $openTimer.Start()
-$form.Add_Shown({ if ($StartAndOpen) { Open-ReadyWebsite } })
+$form.Add_Shown({ if ($StartServer) { Start-ReadyServer } })
 # A previous crashed controller can leave its children running. Recover that
 # session; a fresh launch without an existing server still stays OFF.
 if ($ResumeSession -or (Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue)) {
@@ -210,7 +209,7 @@ if ($ResumeSession -or (Get-NetTCPConnection -LocalPort 39842 -State Listen -Err
 }
 try { [void]$form.ShowDialog() } finally {
     $openTimer.Stop(); $openTimer.Dispose()
-    if ($script:openEvent) { $script:openEvent.Dispose() }
+    if ($script:startEvent) { $script:startEvent.Dispose() }
     Stop-HomeServer
     if ($script:windowMutex) { $script:windowMutex.ReleaseMutex(); $script:windowMutex.Dispose() }
 }

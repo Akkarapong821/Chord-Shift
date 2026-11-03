@@ -46,7 +46,7 @@ export async function checkYouTubeHelper(fetchRequest = fetch) {
   try {
     response = await fetchRequest(`${HELPER_URL}/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
   } catch {
-    throw new Error('เปิด start-youtube-helper.cmd แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย');
+    throw new Error('เปิด start-youtube-helper.cmd แล้วกด Open website ในหน้าต่างตัวช่วยเพื่อใช้หน้า GitHub');
   }
   if (!response.ok) throw new Error('ตัวช่วยไม่อนุญาตให้เว็บนี้เชื่อมต่อ — โปรดอัปเดตตัวช่วยเป็นเวอร์ชันล่าสุด');
   const health = await response.json().catch(() => null);

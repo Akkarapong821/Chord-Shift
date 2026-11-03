@@ -28,6 +28,7 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Opening Melody Tab Home Server.
-echo The helper will start and open Melody Tab on GitHub Pages automatically.
-start "" powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\home-server.ps1" -StartAndOpen
+echo The helper will start without opening a browser.
+echo Click Open website when you want to open Melody Tab on GitHub Pages.
+start "" powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\home-server.ps1" -StartServer
 exit /b 0

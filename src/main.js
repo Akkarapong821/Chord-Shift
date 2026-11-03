@@ -169,9 +169,9 @@ function updateYouTubeSource() {
   const helper = ytSource.value === 'helper';
   $('check-helper-btn').hidden = !helper;
   $('yt-source-help').textContent = ytSource.value === 'home'
-    ? 'ดึงเสียงและแยกกีตาร์บนคอมเครื่องนี้อัตโนมัติ ดับเบิลคลิก start-youtube-helper.cmd เพื่อเปิดพร้อมใช้งาน'
+    ? 'ดึงเสียงและแยกกีตาร์บนคอมเครื่องนี้อัตโนมัติ ดับเบิลคลิก start-youtube-helper.cmd เพื่อเริ่มตัวช่วย แล้วใช้หน้านี้ได้เลย'
     : helper
-    ? 'ดับเบิลคลิก start-youtube-helper.cmd แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย'
+    ? 'ดับเบิลคลิก start-youtube-helper.cmd แล้วกด Open website ในหน้าต่างตัวช่วยเพื่อใช้หน้า GitHub'
     : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';
   $('helper-status').textContent = '';
 }
