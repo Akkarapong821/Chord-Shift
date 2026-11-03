@@ -20,6 +20,7 @@ test('hosted pages use the helper while development keeps its local API', () => 
   assert.equal(defaultYouTubeSource('chord-shift.onrender.com'), 'helper');
   assert.equal(defaultYouTubeSource('127.0.0.1'), 'server');
   assert.equal(defaultYouTubeSource('localhost'), 'server');
+  assert.equal(defaultYouTubeSource('home.example.ts.net'), 'server');
   const video = 'https://youtube.com/watch?v=z164pDlYtOk&list=test';
   const url = new URL(youtubeRequestUrl(video, 'helper'));
   assert.equal(url.origin, 'http://127.0.0.1:39841');

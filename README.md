@@ -118,6 +118,16 @@ GitHub Pages เป็น static hosting จึงใช้ upload เพลง�
 
 ## Deploy เว็บที่รองรับ YouTube
 
+### คอมที่บ้านเป็นเซิร์ฟเวอร์แบบกดเปิดเอง
+
+บน Windows เปิดหน้าต่างควบคุมด้วย `npm run home` หรือชอร์ตคัต **Melody Tab - Home Server** บน Desktop จากนั้นกด **Start server** เมื่อจะใช้งาน กด **Stop server** หรือปิดหน้าต่างเพื่อหยุด ไม่มีการเพิ่ม Startup หรือ Scheduled Task
+
+เซิร์ฟเวอร์เว็บฟังที่ `127.0.0.1:39842` และ Tailscale Serve ส่งต่อผ่าน HTTPS พอร์ต `8443` แบบ foreground เฉพาะตอนที่เปิด ใช้เฉพาะในเครือข่าย Tailscale ไม่เปลี่ยนบริการพอร์ต 443 ที่มีอยู่ มือถือต้องติดตั้ง Tailscale เชื่อมบัญชีเดียวกับคอม แล้วเปิดลิงก์ที่หน้าต่างแสดง การดึง YouTube จะผ่านเน็ตบ้านโดยตรง มือถือไม่ต้องเปิดตัวช่วยเพิ่ม
+
+ก่อนใช้ครั้งแรก: `npm install`, `npm run setup:youtube`, `npm run build` และล็อกอิน Tailscale บนคอมให้เรียบร้อย หากแก้หน้าเว็บให้รัน build ใหม่ก่อนเปิดเซิร์ฟเวอร์
+
+### ใช้ Render
+
 ใช้ Render เพื่อรันทั้งหน้าเว็บและ YouTube API บน service เดียวกัน:
 
 1. Push repository นี้ไป GitHub แล้วเข้า [Render](https://render.com/) และเลือก **New → Blueprint**

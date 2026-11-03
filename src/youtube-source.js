@@ -23,7 +23,7 @@ export function youtubePreviewUrl(value, range) {
 }
 
 export function defaultYouTubeSource(hostname) {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) ? 'server' : 'helper';
+  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.ts.net') ? 'server' : 'helper';
 }
 
 export function youtubeRequestUrl(videoUrl, source) {

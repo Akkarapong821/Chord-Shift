@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "start": "node server/index.js",
     "helper": "node server/helper.js",
+    "home": "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/home-server.ps1",
     "setup:youtube": "node scripts/setup-youtube.mjs",
     "test": "node --test \"src/*.test.js\" \"src/chords/*.test.js\" \"server/*.test.js\""
   },

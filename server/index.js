@@ -32,6 +32,12 @@ export function createAppServer({ distDir = defaultDistDir, youtubeHandler = cre
       return;
     }
 
+    if (pathname === '/api/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ service: 'melody-tab', version: 1 }));
+      return;
+    }
+
     if (pathname === '/api/youtube') {
       if (req.method !== 'GET') {
         res.setHeader('Allow', 'GET');
@@ -75,5 +81,5 @@ export function createAppServer({ distDir = defaultDistDir, youtubeHandler = cre
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const server = createAppServer();
   const port = Number(process.env.PORT) || 3000;
-  server.listen(port, '0.0.0.0', () => console.log(`Melody Tab listening on port ${port}`));
+  server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`Melody Tab listening on port ${port}`));
 }

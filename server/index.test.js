@@ -21,6 +21,8 @@ test('serves the app and built assets from the same origin', async (t) => {
   await writeFile(join(distDir, 'index.html'), '<h1>Chord Shift</h1>');
   await writeFile(join(distDir, 'assets', 'app.js'), 'export {};');
   const base = await withServer(t, createAppServer({ distDir }));
+  const health = await fetch(`${base}/api/health`);
+  assert.deepEqual(await health.json(), { service: 'melody-tab', version: 1 });
 
   const home = await fetch(base);
   assert.equal(home.status, 200);
