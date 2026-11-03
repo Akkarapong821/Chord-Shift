@@ -84,15 +84,18 @@
       border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
     }
     .controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; }
-    .control { display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
+    .control { max-width:100%; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
     .control label { font-size: 13px; color: var(--muted); }
     .control input[type=range] { accent-color: var(--accent); }
     .control .val { font-size: 12px; color: var(--accent); }
     select { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; max-width: 100%; }
-    .time-input { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; width: 180px; }
+    .time-input { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; width: 100%; min-width:0; }
     .time-input:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
     .panel h2 { font-size: 17px; margin: 0 0 12px; }
     .time-actions { margin: 16px 0 0; }
+    .time-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .time-fields .control { min-width:0; }
+    @media (max-width:560px) { #yt-btn { width:100%; order:-1; } }
     .note { color: var(--muted); font-size: 13px; line-height: 1.7; }
     audio { width: 100%; margin-top: 8px; }
     button:disabled { opacity: .5; cursor: default; }
@@ -135,56 +138,39 @@
     </header>
 
     <div class="panel">
-      <h2>รับเสียงจากแท็บเพลง</h2>
-      <p class="note">เปิด YouTube ในอีกแท็บ เลื่อนไปก่อนช่วงโซโล่ แล้วกดรับเสียง เลือกแท็บนั้นพร้อมติ๊ก <strong>แชร์เสียงของแท็บ</strong> จากนั้นเล่นเพลงจนจบช่วงที่ต้องการ</p>
-      <div class="toolbar">
-        <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" style="color: var(--accent); align-self: center;">เปิด YouTube ↗</a>
-        <button class="primary" id="record-tab-btn">● รับเสียงจากแท็บ</button>
-        <button id="stop-record-btn" disabled>■ หยุดและแกะเป็น TAB</button>
-        <button id="cancel-record-btn" disabled>ยกเลิกการรับเสียง</button>
+      <h2>วางลิงก์ YouTube และเลือกช่วงโซโล่</h2>
+      <label for="yt-url" class="note">ลิงก์เพลง YouTube</label>
+      <div class="yt-row" style="margin:8px 0 18px;">
+        <input type="url" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่" />
       </div>
-      <p class="note" id="record-status" role="status">ไม่ต้องเปิดตัวช่วยหรือเซิร์ฟเวอร์แยก · เหมาะกับ Chrome / Edge บนคอมพิวเตอร์</p>
-      <p class="note">บันทึกเฉพาะเสียงที่คุณเลือกในเครื่อง สูงสุด 15 นาที · เวลาในเสียงที่รับเริ่มจาก 0:00 เลือกตัดช่วงเพิ่มเติมได้หลังรับเสียง</p>
-    </div>
-
-    <div class="panel">
-      <h2>เลือกช่วงโซโล่ที่ต้องการแกะ</h2>
-      <div class="controls">
+      <div class="time-fields">
         <div class="control">
           <label for="time-start">เวลาเริ่มต้น</label>
           <input class="time-input" id="time-start" type="text" value="0:00" placeholder="เช่น 1:25" aria-describedby="time-help" />
-          <button id="use-start-btn" disabled>ใช้เวลาที่กำลังฟังเป็นจุดเริ่ม</button>
+          <button id="use-start-btn" disabled hidden>ใช้เวลาที่กำลังฟังเป็นจุดเริ่ม</button>
         </div>
         <div class="control">
-          <label for="time-end">เวลาสิ้นสุด</label>
-          <input class="time-input" id="time-end" type="text" placeholder="จนจบเพลง" aria-describedby="time-help" />
-          <button id="use-end-btn" disabled>ใช้เวลาที่กำลังฟังเป็นจุดจบ</button>
+          <label for="time-end">เวลาหยุด (สิ้นสุด)</label>
+          <input class="time-input" id="time-end" type="text" placeholder="เช่น 1:35 (ว่าง = จบเพลง)" aria-describedby="time-help" />
+          <button id="use-end-btn" disabled hidden>ใช้เวลาที่กำลังฟังเป็นจุดจบ</button>
         </div>
       </div>
       <p class="note" id="time-help">ใส่เวลาแบบ 1:25 หรือ 85 วินาที · เว้นเวลาสิ้นสุดว่างเพื่อแกะจนจบเพลง<br>เลือกช่วงก่อนอัปโหลดหรือดึงจาก YouTube ได้ หลังโหลดเพลงแล้วเปลี่ยนช่วงและแกะใหม่ได้ทันที</p>
+      <p id="yt-range-summary" class="note" aria-live="polite">เริ่ม 0:00 → จบเพลง</p>
       <div class="toolbar time-actions">
-        <button class="primary" id="analyze-range-btn" disabled>แกะช่วงที่เลือก</button>
-        <button id="preview-range-btn" disabled>▶ ฟังช่วงที่เลือก</button>
+        <button id="yt-preview-btn">▶ ฟังช่วงนี้บน YouTube</button>
+        <button id="yt-preview-stop-btn" disabled hidden>■ หยุดฟัง</button>
+        <button class="primary" id="yt-btn">แกะ TAB เฉพาะช่วงนี้</button>
+        <button class="primary" id="analyze-range-btn" disabled hidden>แกะใหม่จากเสียงที่โหลดแล้ว</button>
+        <button id="preview-range-btn" disabled hidden>▶ ฟังช่วงที่เลือก</button>
         <button id="full-range-btn">เลือกทั้งเพลง</button>
       </div>
-      <p class="note" id="range-status" aria-live="polite">ยังไม่ได้โหลดเพลง · เริ่ม 0:00 ถึงจบเพลง</p>
-    </div>
-
-    <div id="dropzone">
-      <div class="big">🎵</div>
-      <div><strong>ลากไฟล์เพลงมาวางที่นี่</strong> หรือคลิกเพื่อเลือกไฟล์</div>
-      <div class="hint">รองรับ MP3, WAV, M4A, OGG — ใช้เสียงกีตาร์เดี่ยวหรือไฟล์แยกเสียงกีตาร์จะได้ผลดีที่สุด</div>
-      <input type="file" id="file-input" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" />
-    </div>
-
-    <div class="or-divider">หรือ</div>
-
-    <details>
-      <summary style="cursor: pointer; color: var(--muted); margin-bottom: 12px;">ตัวเลือกดึงจากลิงก์ YouTube ผ่านตัวช่วยหรือเซิร์ฟเวอร์</summary>
-    <div class="yt-row">
-      <input type="url" id="yt-url" placeholder="วางลิงก์ YouTube เช่น https://youtu.be/…" />
-      <button class="primary" id="yt-btn">🎬 แกะโน้ตจาก YouTube</button>
-    </div>
+      <div id="yt-preview-section" hidden>
+        <iframe id="yt-preview" title="ฟังช่วงโซโล่จาก YouTube" allow="autoplay; encrypted-media; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="width:100%; aspect-ratio:16/9; border:0; border-radius:10px;"></iframe>
+        <p class="note">ตัวอย่างเล่นตั้งแต่เวลาเริ่มและหยุดที่เวลาสิ้นสุด (ละเอียดเป็นวินาที) หากไม่เล่นอัตโนมัติให้กดเล่นในวิดีโอ</p>
+      </div>
+      <details style="margin:12px 0;">
+        <summary style="cursor:pointer; color:var(--muted);">ตั้งค่าตัวช่วย / เซิร์ฟเวอร์สำหรับแกะ TAB</summary>
     <div class="panel" style="margin-top: 12px;">
       <div class="controls">
         <div class="control">
@@ -199,6 +185,35 @@
       <p class="note" id="yt-source-help"></p>
       <p class="note" id="helper-status" role="status"></p>
     </div>
+      </details>
+      <p class="note">การฟังตัวอย่าง YouTube ใช้ได้โดยตรง ส่วนการแกะ TAB จากลิงก์ยังต้องเชื่อมต่อตัวช่วยหรือเซิร์ฟเวอร์ที่ดึงเสียงได้</p>
+      <p class="note" id="range-status" aria-live="polite">ยังไม่ได้โหลดเพลง · เริ่ม 0:00 ถึงจบเพลง</p>
+    </div>
+
+    <div id="dropzone">
+      <div class="big">🎵</div>
+      <div><strong>ลากไฟล์เพลงมาวางที่นี่</strong> หรือคลิกเพื่อเลือกไฟล์</div>
+      <div class="hint">รองรับ MP3, WAV, M4A, OGG — ใช้เสียงกีตาร์เดี่ยวหรือไฟล์แยกเสียงกีตาร์จะได้ผลดีที่สุด</div>
+      <input type="file" id="file-input" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" />
+    </div>
+
+    <div class="or-divider">หรือ</div>
+
+    <details>
+      <summary style="cursor:pointer; margin-bottom:12px;">รับเสียงจากแท็บเพลง (สำหรับคอมพิวเตอร์)</summary>
+    <div class="panel">
+      <h2>รับเสียงจากแท็บเพลง</h2>
+      <p class="note">เปิด YouTube ในอีกแท็บ เลื่อนไปก่อนช่วงโซโล่ แล้วกดรับเสียง เลือกแท็บนั้นพร้อมติ๊ก <strong>แชร์เสียงของแท็บ</strong> จากนั้นเล่นเพลงจนจบช่วงที่ต้องการ</p>
+      <div class="toolbar">
+        <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" style="color: var(--accent); align-self: center;">เปิด YouTube ↗</a>
+        <button class="primary" id="record-tab-btn">● รับเสียงจากแท็บ</button>
+        <button id="stop-record-btn" disabled>■ หยุดและแกะเป็น TAB</button>
+        <button id="cancel-record-btn" disabled>ยกเลิกการรับเสียง</button>
+      </div>
+      <p class="note" id="record-status" role="status">ไม่ต้องเปิดตัวช่วยหรือเซิร์ฟเวอร์แยก · เหมาะกับ Chrome / Edge บนคอมพิวเตอร์</p>
+      <p class="note">บันทึกเฉพาะเสียงที่คุณเลือกในเครื่อง สูงสุด 15 นาที · เวลาในเสียงที่รับเริ่มจาก 0:00 เลือกตัดช่วงเพิ่มเติมได้หลังรับเสียง</p>
+    </div>
+
     </details>
 
     <div id="progress-section">

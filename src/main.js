@@ -5,7 +5,7 @@ import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime } from './audio-range.js';
-import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl } from './youtube-source.js';
+import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
 
 const $ = (id) => document.getElementById(id);
@@ -124,6 +124,36 @@ fileInput.addEventListener('change', () => {
 const ytUrl = $('yt-url');
 const ytBtn = $('yt-btn');
 const ytSource = $('yt-source');
+function stopYouTubePreview() {
+  $('yt-preview').removeAttribute('src');
+  $('yt-preview-section').hidden = true;
+  $('yt-preview-stop-btn').disabled = true;
+  $('yt-preview-stop-btn').hidden = true;
+}
+function updateYouTubeRangeSummary() {
+  try {
+    const range = readAudioRange(timeStart.value, timeEnd.value);
+    const end = Number.isFinite(range.end) ? formatAudioTime(range.end) : 'จบเพลง';
+    const length = Number.isFinite(range.end) ? ` · แกะ ${Number((range.end - range.start).toFixed(3))} วินาที` : '';
+    $('yt-range-summary').textContent = `เริ่ม ${formatAudioTime(range.start)} → หยุด ${end}${length}`;
+  } catch (error) { $('yt-range-summary').textContent = error.message; }
+}
+$('yt-preview-btn').addEventListener('click', () => {
+  if (busy) return;
+  hideError();
+  try {
+    const range = readAudioRange(timeStart.value, timeEnd.value);
+    const url = youtubePreviewUrl(ytUrl.value.trim(), range);
+    originalAudio.pause(); stopPlayback(); setPlaying(false);
+    $('yt-preview').src = url;
+    $('yt-preview-section').hidden = false;
+    $('yt-preview-stop-btn').disabled = false;
+    $('yt-preview-stop-btn').hidden = false;
+  } catch (error) { showError(error.message); }
+});
+$('yt-preview-stop-btn').addEventListener('click', stopYouTubePreview);
+ytUrl.addEventListener('input', stopYouTubePreview);
+updateYouTubeRangeSummary();
 ytSource.value = defaultYouTubeSource(location.hostname);
 function updateYouTubeSource() {
   const helper = ytSource.value === 'helper';
@@ -251,13 +281,16 @@ function setBusy(on) {
   recordButton.disabled = on || !canRecordTab();
   ytBtn.disabled = on;
   ytSource.disabled = on;
+  $('yt-preview-btn').disabled = on;
   $('check-helper-btn').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
     $(id).disabled = on || !decodedAudio;
+    $(id).hidden = !decodedAudio;
   }
   dropzone.setAttribute('aria-busy', String(on));
   if (on) {
+    stopYouTubePreview();
     stopPlayback();
     setPlaying(false);
     originalAudio.pause();
@@ -313,6 +346,7 @@ async function analyzeSelection() {
 }
 
 function updateRangeStatus() {
+  updateYouTubeRangeSummary();
   const loaded = decodedAudio ? `ความยาวเพลง ${formatAudioTime(decodedAudio.duration)}` : 'ยังไม่ได้โหลดเพลง';
   try {
     const range = requestedRange();
@@ -324,6 +358,8 @@ function updateRangeStatus() {
 }
 
 function rangeChanged() {
+  stopYouTubePreview();
+  updateYouTubeRangeSummary();
   stopPlayback();
   setPlaying(false);
   originalAudio.pause();

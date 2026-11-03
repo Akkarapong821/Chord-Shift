@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultYouTubeSource, youtubeRequestUrl, checkYouTubeHelper } from './youtube-source.js';
+import { defaultYouTubeSource, youtubeRequestUrl, checkYouTubeHelper, youtubePreviewUrl } from './youtube-source.js';
+
+test('YouTube preview plays the selected interval with an absolute stop time', () => {
+  const preview = new URL(youtubePreviewUrl('https://youtu.be/z164pDlYtOk?t=5', { start: 85, end: 95 }));
+  assert.equal(preview.origin, 'https://www.youtube-nocookie.com');
+  assert.equal(preview.pathname, '/embed/z164pDlYtOk');
+  assert.equal(preview.searchParams.get('start'), '85');
+  assert.equal(preview.searchParams.get('end'), '95');
+  assert.equal(preview.searchParams.get('playsinline'), '1');
+  const whole = new URL(youtubePreviewUrl('https://youtube.com/watch?v=z164pDlYtOk&list=abc', { start: 0, end: Infinity }));
+  assert.equal(whole.searchParams.has('end'), false);
+  for (const url of ['https://youtube.com.evil.test/watch?v=z164pDlYtOk', 'javascript:alert(1)', 'invalid']) {
+    assert.throws(() => youtubePreviewUrl(url, { start: 0, end: 10 }));
+  }
+});
 
 test('hosted pages use the helper while development keeps its local API', () => {
   assert.equal(defaultYouTubeSource('chord-shift.onrender.com'), 'helper');
