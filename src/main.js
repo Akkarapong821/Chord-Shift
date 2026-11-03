@@ -6,6 +6,7 @@ import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime } from './audio-range.js';
 import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl } from './youtube-source.js';
+import { canRecordTab, startTabRecording } from './tab-recording.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,6 +37,57 @@ let decodedAudio = null;
 let analyzedRange = null;
 let previewEnd = null;
 let previewFrame = null;
+let recording = null;
+const recordButton = $('record-tab-btn');
+if (!canRecordTab()) {
+  recordButton.disabled = true;
+  $('record-status').textContent = 'เบราว์เซอร์นี้ยังไม่รองรับการรับเสียงจากแท็บ — เปิดเว็บใน Chrome / Edge บนคอมพิวเตอร์ หรืออัปโหลดไฟล์เสียง';
+}
+recordButton.addEventListener('click', async () => {
+  if (busy) return;
+  hideError();
+  resultSection.style.display = 'none';
+  setBusy(true);
+  $('record-status').textContent = 'เลือกแท็บที่เล่นเพลง พร้อมเปิดแชร์เสียงของแท็บ…';
+  let clock;
+  try {
+    recording = await startTabRecording();
+    $('stop-record-btn').disabled = false;
+    $('cancel-record-btn').disabled = false;
+    const started = performance.now();
+    const update = () => {
+      $('record-status').textContent = `กำลังรับเสียง ${formatAudioTime((performance.now() - started) / 1000)} · เล่นช่วงโซโล่แล้วกดหยุดเพื่อแกะ TAB (หยุดอัตโนมัติที่ 15 นาที)`;
+    };
+    update(); clock = setInterval(update, 250);
+    const blob = await recording.finished;
+    clearInterval(clock);
+    recording = null;
+    $('stop-record-btn').disabled = true;
+    $('cancel-record-btn').disabled = true;
+    if (!blob) { $('record-status').textContent = 'ยกเลิกแล้ว · เสียงที่รับไม่ได้ถูกนำไปแกะ'; return; }
+    timeStart.value = '0:00';
+    timeEnd.value = '';
+    $('record-status').textContent = 'รับเสียงแล้ว · กำลังแกะ TAB จากเสียงในเบราว์เซอร์';
+    const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+    await processFile(new File([blob], `เสียงจากแท็บ-${Date.now()}.${ext}`, { type: blob.type }));
+    $('record-status').textContent = raw ? 'รับเสียงเสร็จแล้ว · เวลาในแท็บนับจากเริ่มรับเสียง' : 'รับเสียงแล้ว แต่ยังแกะไม่สำเร็จ · ดูข้อความข้อผิดพลาดด้านล่าง';
+  } catch (error) {
+    const message = error.name === 'NotAllowedError' || error.name === 'AbortError'
+      ? 'ยังไม่ได้อนุญาตแชร์แท็บ — กดรับเสียงแล้วเลือกแท็บที่เล่นเพลงพร้อมแชร์เสียง'
+      : error.message;
+    $('record-status').textContent = message;
+    showError(message);
+  } finally {
+    clearInterval(clock);
+    recording = null;
+    $('stop-record-btn').disabled = true;
+    $('cancel-record-btn').disabled = true;
+    setBusy(false);
+  }
+});
+$('stop-record-btn').addEventListener('click', () => recording?.stop());
+$('cancel-record-btn').addEventListener('click', () => recording?.cancel());
+window.addEventListener('pagehide', () => recording?.cancel());
 
 function requestedRange() {
   return readAudioRange(timeStart.value, timeEnd.value, decodedAudio?.duration ?? Infinity);
@@ -196,6 +248,7 @@ async function handleFile(file) {
 function setBusy(on) {
   busy = on;
   fileInput.disabled = on;
+  recordButton.disabled = on || !canRecordTab();
   ytBtn.disabled = on;
   ytSource.disabled = on;
   $('check-helper-btn').disabled = on;

@@ -130,9 +130,22 @@
   <div class="wrap">
     <header>
       <h1>🎸 Melody <span class="accent">Tab</span></h1>
-      <p>แกะไลน์เมโลดี้และโซโล่กีตาร์ไฟฟ้าเป็น Guitar TAB — วิเคราะห์เสียงในเครื่องคุณ</p>
+      <p>แกะไลน์เมโลดี้และโซโล่กีตาร์ไฟฟ้าเป็น Guitar TAB — รับเสียงและวิเคราะห์ในเบราว์เซอร์</p>
       <p><a href="./chords.html" style="color: var(--accent); font-size: 14px;">มีรูปคอร์ดเพลง? เปลี่ยนคีย์ด้วย Chord Shift →</a></p>
     </header>
+
+    <div class="panel">
+      <h2>รับเสียงจากแท็บเพลง</h2>
+      <p class="note">เปิด YouTube ในอีกแท็บ เลื่อนไปก่อนช่วงโซโล่ แล้วกดรับเสียง เลือกแท็บนั้นพร้อมติ๊ก <strong>แชร์เสียงของแท็บ</strong> จากนั้นเล่นเพลงจนจบช่วงที่ต้องการ</p>
+      <div class="toolbar">
+        <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" style="color: var(--accent); align-self: center;">เปิด YouTube ↗</a>
+        <button class="primary" id="record-tab-btn">● รับเสียงจากแท็บ</button>
+        <button id="stop-record-btn" disabled>■ หยุดและแกะเป็น TAB</button>
+        <button id="cancel-record-btn" disabled>ยกเลิกการรับเสียง</button>
+      </div>
+      <p class="note" id="record-status" role="status">ไม่ต้องเปิดตัวช่วยหรือเซิร์ฟเวอร์แยก · เหมาะกับ Chrome / Edge บนคอมพิวเตอร์</p>
+      <p class="note">บันทึกเฉพาะเสียงที่คุณเลือกในเครื่อง สูงสุด 15 นาที · เวลาในเสียงที่รับเริ่มจาก 0:00 เลือกตัดช่วงเพิ่มเติมได้หลังรับเสียง</p>
+    </div>
 
     <div class="panel">
       <h2>เลือกช่วงโซโล่ที่ต้องการแกะ</h2>
@@ -166,6 +179,8 @@
 
     <div class="or-divider">หรือ</div>
 
+    <details>
+      <summary style="cursor: pointer; color: var(--muted); margin-bottom: 12px;">ตัวเลือกดึงจากลิงก์ YouTube ผ่านตัวช่วยหรือเซิร์ฟเวอร์</summary>
     <div class="yt-row">
       <input type="url" id="yt-url" placeholder="วางลิงก์ YouTube เช่น https://youtu.be/…" />
       <button class="primary" id="yt-btn">🎬 แกะโน้ตจาก YouTube</button>
@@ -184,6 +199,7 @@
       <p class="note" id="yt-source-help"></p>
       <p class="note" id="helper-status" role="status"></p>
     </div>
+    </details>
 
     <div id="progress-section">
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
