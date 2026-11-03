@@ -5,7 +5,7 @@ import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
-import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, normalizeHomeServer, checkHomeServer } from './youtube-source.js';
+import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, normalizeHomeServer, checkHomeServer, LOCAL_SERVER_URL } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
 
 const $ = (id) => document.getElementById(id);
@@ -130,11 +130,15 @@ const ytBtn = $('yt-btn');
 const ytSource = $('yt-source');
 const homeServerInput = $('home-server-url');
 let connectedHome = '';
-try { homeServerInput.value = localStorage.getItem('melody-home-server') || ''; } catch { }
+homeServerInput.value = LOCAL_SERVER_URL;
+try {
+  const saved = localStorage.getItem('melody-home-server');
+  if (saved) homeServerInput.value = normalizeHomeServer(saved);
+} catch { /* Replace old phone/Tailscale links with the local desktop server. */ }
 const homeParam = new URL(location.href).searchParams.get('home');
 if (homeParam) {
   try { homeServerInput.value = normalizeHomeServer(homeParam); }
-  catch (error) { $('home-status').textContent = error.message; }
+  catch { /* Old shared phone links now connect only to this computer. */ }
   const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('home');
   history.replaceState(null, '', cleanUrl);
 }
@@ -147,18 +151,18 @@ function updateDirectHomeLink() {
 updateDirectHomeLink();
 async function connectHome() {
   $('connect-home-btn').disabled = true;
-  $('home-status').textContent = 'กำลังเชื่อมต่อคอมบ้าน…';
+  $('home-status').textContent = 'กำลังเชื่อมต่อคอมนี้…';
   updateDirectHomeLink();
   try {
     connectedHome = await checkHomeServer(homeServerInput.value.trim());
     try { localStorage.setItem('melody-home-server', connectedHome); } catch { }
-    $('home-status').textContent = 'เชื่อมต่อคอมบ้านแล้ว · วางลิงก์ YouTube และแกะ TAB จากหน้านี้ได้เลย';
+    $('home-status').textContent = 'เชื่อมต่อคอมนี้แล้ว · วางลิงก์ YouTube และแกะ TAB จากหน้านี้ได้เลย';
     return connectedHome;
   } catch (error) {
     connectedHome = ''; $('home-status').textContent = error.message; throw error;
   } finally { $('connect-home-btn').disabled = busy; }
 }
-homeServerInput.addEventListener('input', () => { connectedHome = ''; updateDirectHomeLink(); $('home-status').textContent = 'กดเชื่อมต่อคอมบ้านเพื่อใช้ลิงก์นี้'; });
+homeServerInput.addEventListener('input', () => { connectedHome = ''; updateDirectHomeLink(); $('home-status').textContent = 'กดเชื่อมต่อคอมนี้เพื่อใช้ลิงก์นี้'; });
 $('connect-home-btn').addEventListener('click', () => connectHome().catch(() => {}));
 $('cancel-youtube-btn').addEventListener('click', () => youtubeAbort?.abort());
 function stopYouTubePreview() {
@@ -197,7 +201,7 @@ function updateYouTubeSource() {
   $('home-connection').hidden = ytSource.value !== 'home';
   $('check-helper-btn').hidden = !helper;
   $('yt-source-help').textContent = ytSource.value === 'home'
-    ? 'ดึงเสียงและแยกกีตาร์ผ่านคอมบ้านที่เชื่อมต่อไว้ ต้องเปิดคอมและ Tailscale ขณะใช้งาน'
+    ? 'ดึงเสียงและแยกกีตาร์บนคอมเครื่องนี้ เปิด Home Server แล้วกด Start server ก่อนใช้งาน'
     : helper
     ? 'หากเปิด start-youtube-helper.cmd ให้กด Start server แล้วกด Open website ในหน้าต่าง Home Server และใช้งานจากเว็บคอมบ้านที่เปิดขึ้นมา'
     : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';

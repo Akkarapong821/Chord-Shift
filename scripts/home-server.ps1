@@ -1,11 +1,9 @@
 param([switch]$SmokeTest, [switch]$TestYouTube, [switch]$ResumeSession)
 $ErrorActionPreference = 'Stop'
 $projectDir = Split-Path -Parent $PSScriptRoot
-$tailscalePath = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
 $nodePath = (Get-Command node -ErrorAction Stop).Source
 $script:webProcess = $null
-$script:serveProcess = $null
-$script:phoneUrl = ''
+$script:websiteUrl = 'http://127.0.0.1:39842/index.html?page=melody'
 $logDir = Join-Path $projectDir '.tools'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $script:windowMutex = $null
@@ -40,7 +38,7 @@ if (-not $SmokeTest) {
 
 function Stop-HomeServer {
     # These handles belong only to processes created by this window.
-    foreach ($ownedProcess in @($script:serveProcess, $script:webProcess)) {
+    foreach ($ownedProcess in @($script:webProcess)) {
         if ($null -ne $ownedProcess -and -not $ownedProcess.HasExited) {
             # Stop this window's process tree, including an active separator
             # or downloader, without targeting unrelated Python/Node services.
@@ -48,24 +46,13 @@ function Stop-HomeServer {
             $ownedProcess.WaitForExit(5000) | Out-Null
         }
     }
-    $script:serveProcess = $null
     $script:webProcess = $null
 }
 
 function Start-HomeServer {
     if ($script:webProcess -and -not $script:webProcess.HasExited) { return }
-    if (-not (Test-Path -LiteralPath $tailscalePath)) { throw 'Install Tailscale on this computer first.' }
     if (-not (Test-Path -LiteralPath (Join-Path $projectDir 'dist/index.html'))) { throw 'Build the website first: npm run build' }
     if (-not (Test-Path -LiteralPath (Join-Path $projectDir '.tools/yt-dlp.exe'))) { throw 'Install the YouTube downloader first: npm run setup:youtube' }
-    $tailJson = & $tailscalePath status --json 2>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot connect to Tailscale. Open Tailscale and sign in.' }
-    $tailState = $tailJson | ConvertFrom-Json
-    if ($tailState.BackendState -ne 'Running') { throw 'Connect Tailscale on this computer before starting.' }
-    $dnsName = $tailState.Self.DNSName.TrimEnd('.')
-    if (-not $dnsName) { throw 'Tailscale DNS name is unavailable.' }
-    $serveJson = & $tailscalePath serve status --json 2>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing Tailscale services.' }
-    $serveConfig = $serveJson | ConvertFrom-Json
     $portUsed = Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($portUsed) {
         # Recover only an orphaned server proven to serve this project's exact
@@ -78,18 +65,14 @@ function Start-HomeServer {
             $page = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:39842/index.html?page=melody' -TimeoutSec 3
             $sameBuild = $health.service -eq 'melody-tab' -and $page.Content -eq [IO.File]::ReadAllText((Join-Path $projectDir 'dist/index.html'))
         } catch { }
-        $oldServe = Get-CimInstance Win32_Process -Filter "name='tailscale.exe'" | Where-Object {
-            $_.ParentProcessId -eq $webInfo.ParentProcessId -and $_.CommandLine -match 'serve --https=8443 --bg=false http://127\.0\.0\.1:39842'
-        } | Select-Object -First 1
-        if ($sameBuild -and $webInfo.Name -eq 'node.exe' -and $webInfo.CommandLine -match 'server[\\/]index\.js' -and -not $oldParent -and $oldServe) {
+        if ($sameBuild -and $webInfo.Name -eq 'node.exe' -and $webInfo.CommandLine -match 'server[\\/]index\.js' -and -not $oldParent) {
             $script:webProcess = Get-Process -Id $webInfo.ProcessId
-            $script:serveProcess = Get-Process -Id $oldServe.ProcessId
             Stop-HomeServer
             Start-Sleep -Milliseconds 700
         } else {
             throw 'Another application or home-server window is using port 39842. The existing service was left running.'
         }
-    } elseif ($serveConfig.TCP.'8443') { throw 'Tailscale port 8443 is already used by another service.' }
+    }
     try {
         $oldPort = $env:PORT; $oldBind = $env:HOST
         try {
@@ -105,24 +88,18 @@ function Start-HomeServer {
             } catch { Start-Sleep -Milliseconds 250 }
         }
         if (-not $ready) { throw 'The local web server did not start.' }
-        # Foreground Serve belongs to this child process. No --bg, scheduled
-        # task, startup entry, public Funnel or change to the existing port 443.
-        $script:serveProcess = Start-Process -FilePath $tailscalePath -ArgumentList @('serve', '--https=8443', '--bg=false', 'http://127.0.0.1:39842') -WorkingDirectory $projectDir -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir 'home-tailscale.log') -RedirectStandardError (Join-Path $logDir 'home-tailscale-error.log')
-        Start-Sleep -Milliseconds 1500
-        if ($script:serveProcess.HasExited) { throw 'Tailscale Serve could not start. See .tools/home-tailscale-error.log' }
-        $script:phoneUrl = "https://${dnsName}:8443/index.html?page=melody"
-        $script:websiteUrl = 'https://akkarapong821.github.io/Chord-Shift/index.html?page=melody&home=' + [Uri]::EscapeDataString($script:phoneUrl)
+        # Loopback only: this desktop app does not open a phone or LAN endpoint.
     } catch { Stop-HomeServer; throw }
 }
 
 if ($SmokeTest) {
     try {
         Start-HomeServer
-        $page = Invoke-WebRequest -UseBasicParsing -Uri $script:phoneUrl -TimeoutSec 15
+        $page = Invoke-WebRequest -UseBasicParsing -Uri $script:websiteUrl -TimeoutSec 15
         if ($page.StatusCode -ne 200 -or -not $page.Content.Contains('id="yt-btn"')) { throw 'Home website check failed.' }
-        Write-Output "PASS: $script:phoneUrl"
+        Write-Output "PASS: $script:websiteUrl"
         if ($TestYouTube) {
-            $origin = ([Uri]$script:phoneUrl).GetLeftPart([System.UriPartial]::Authority)
+            $origin = ([Uri]$script:websiteUrl).GetLeftPart([System.UriPartial]::Authority)
             $audioFile = Join-Path $logDir 'home-youtube-test.m4a'
             $audioResponse = Invoke-WebRequest -UseBasicParsing -Uri ($origin + '/api/youtube?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dz164pDlYtOk') -OutFile $audioFile -PassThru -TimeoutSec 75
             $receivedBytes = (Get-Item -LiteralPath $audioFile).Length
@@ -164,27 +141,21 @@ $stopButton.Location = New-Object System.Drawing.Point(165, 135)
 $stopButton.Size = New-Object System.Drawing.Size(135, 40)
 $stopButton.Enabled = $false
 $form.Controls.Add($stopButton)
-$copyButton = New-Object System.Windows.Forms.Button
-$copyButton.Text = 'Copy phone link'
-$copyButton.Location = New-Object System.Drawing.Point(310, 135)
-$copyButton.Size = New-Object System.Drawing.Size(145, 40)
-$copyButton.Enabled = $false
-$form.Controls.Add($copyButton)
 $openButton = New-Object System.Windows.Forms.Button
 $openButton.Text = 'Open website'
-$openButton.Location = New-Object System.Drawing.Point(465, 135)
-$openButton.Size = New-Object System.Drawing.Size(135, 40)
+$openButton.Location = New-Object System.Drawing.Point(310, 135)
+$openButton.Size = New-Object System.Drawing.Size(145, 40)
 $openButton.Enabled = $false
 $form.Controls.Add($openButton)
 $helpLabel = New-Object System.Windows.Forms.Label
-$helpLabel.Text = 'Keep this window open. Connect Tailscale on your phone using the same account. Stop server or close this window when finished.'
+$helpLabel.Text = 'Melody Tab runs on this computer only. Phones use Chord Shift on the public website. Stop server or close this window when finished.'
 $helpLabel.Location = New-Object System.Drawing.Point(20, 195)
 $helpLabel.Size = New-Object System.Drawing.Size(580, 55)
 $form.Controls.Add($helpLabel)
 function Show-ServerOn {
     $urlBox.Text = $script:websiteUrl
     $statusLabel.Text = 'Server ON - click Open website to use Melody Tab.'
-    $startButton.Enabled = $false; $stopButton.Enabled = $true; $copyButton.Enabled = $true; $openButton.Enabled = $true
+    $startButton.Enabled = $false; $stopButton.Enabled = $true; $openButton.Enabled = $true
 }
 $startButton.Add_Click({
     $startButton.Enabled = $false
@@ -201,9 +172,8 @@ $startButton.Add_Click({
 $stopButton.Add_Click({
     Stop-HomeServer
     $statusLabel.Text = 'Server OFF - click Start server when you want to use it.'
-    $startButton.Enabled = $true; $stopButton.Enabled = $false; $copyButton.Enabled = $false; $openButton.Enabled = $false
+    $startButton.Enabled = $true; $stopButton.Enabled = $false; $openButton.Enabled = $false
 })
-$copyButton.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($script:websiteUrl) })
 $openButton.Add_Click({ Start-Process $script:websiteUrl })
 $form.Add_FormClosing({ Stop-HomeServer })
 # A previous crashed controller can leave its children running. Recover that

@@ -3,11 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script>
-    if (new URLSearchParams(location.search).get('page') !== 'melody') {
-      location.replace('./chords.html');
-    }
-  </script>
+  <script src="./device-access.js"></script>
   <title>Melody Tab — แกะเมโลดี้กีตาร์ไฟฟ้าเป็น TAB</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -138,14 +134,14 @@
     </header>
 
     <div class="panel" id="home-connection" hidden>
-      <h2>เชื่อมต่อเซิร์ฟเวอร์คอมบ้าน</h2>
+      <h2>เชื่อมต่อเซิร์ฟเวอร์บนคอมนี้</h2>
       <label for="home-server-url" class="note">ลิงก์จากหน้าต่าง Home Server</label>
       <div class="yt-row" style="margin-top:8px;">
-        <input id="home-server-url" type="url" placeholder="https://ชื่อคอม.ts.net:8443/…" />
-        <button id="connect-home-btn">เชื่อมต่อคอมบ้าน</button>
+        <input id="home-server-url" type="url" placeholder="http://127.0.0.1:39842" />
+        <button id="connect-home-btn">เชื่อมต่อคอมนี้</button>
       </div>
-      <p class="note" id="home-status" role="status">กด Copy phone link ในหน้าต่าง Home Server แล้ววางลิงก์ที่นี่เพียงครั้งเดียว เว็บจะจำไว้ให้</p>
-      <a id="home-direct-link" hidden target="_blank" rel="noopener noreferrer" style="color:var(--accent)">เปิดเว็บคอมบ้านโดยตรง หากเบราว์เซอร์ไม่อนุญาตการเชื่อมต่อจาก GitHub ↗</a>
+      <p class="note" id="home-status" role="status">เปิด Home Server แล้วกด Start server หรือกด Open website เพื่อใช้เว็บบนคอมนี้โดยตรง</p>
+      <a id="home-direct-link" hidden target="_blank" rel="noopener noreferrer" style="color:var(--accent)">เปิดเว็บบนคอมนี้โดยตรง ↗</a>
     </div>
 
     <div class="panel">
@@ -190,7 +186,7 @@
         <div class="control">
           <label for="yt-source">ดึงเสียง YouTube ผ่าน</label>
           <select id="yt-source">
-            <option value="home">เซิร์ฟเวอร์คอมบ้าน</option>
+            <option value="home">เซิร์ฟเวอร์บนคอมนี้</option>
             <option value="helper">ตัวช่วยบนเครื่องนี้</option>
             <option value="server">เซิร์ฟเวอร์เว็บ</option>
           </select>

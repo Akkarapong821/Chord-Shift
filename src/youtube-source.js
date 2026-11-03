@@ -1,4 +1,5 @@
 export const HELPER_URL = 'http://127.0.0.1:39841';
+export const LOCAL_SERVER_URL = 'http://127.0.0.1:39842';
 const HELPER_SERVICE = 'melody-tab-youtube-helper';
 
 export function youtubePreviewUrl(value, range) {
@@ -23,7 +24,7 @@ export function youtubePreviewUrl(value, range) {
 }
 
 export function defaultYouTubeSource(hostname) {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.ts.net') ? 'server' : 'home';
+  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) ? 'server' : 'home';
 }
 
 export function normalizeHomeServer(value) {
@@ -32,16 +33,16 @@ export function normalizeHomeServer(value) {
     if (url.origin === 'https://akkarapong821.github.io' && url.pathname === '/Chord-Shift/index.html' && url.searchParams.has('home')) {
       url = new URL(url.searchParams.get('home'));
     }
-    if (url.protocol !== 'https:' || !url.hostname.endsWith('.ts.net') || url.username || url.password) throw new Error();
+    if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password) throw new Error();
     return url.origin;
-  } catch { throw new Error('วางลิงก์คอมบ้านจากปุ่ม Copy phone link ในหน้าต่าง Home Server ก่อนครับ'); }
+  } catch { throw new Error('ใช้ลิงก์เซิร์ฟเวอร์บนคอมนี้ เช่น http://127.0.0.1:39842 เท่านั้น'); }
 }
 
 export async function checkHomeServer(value, fetchRequest = fetch) {
   const origin = normalizeHomeServer(value);
   let response;
   try { response = await fetchRequest(`${origin}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
-  catch { throw new Error('ยังเชื่อมต่อคอมบ้านไม่ได้ — ตรวจว่า Server ON และ Tailscale เชื่อมต่ออยู่ หากเบราว์เซอร์ถามให้อนุญาตการเข้าถึงเครือข่ายในเครื่อง'); }
+  catch { throw new Error('ยังเชื่อมต่อคอมนี้ไม่ได้ — ตรวจว่า Home Server ขึ้น Server ON หากเบราว์เซอร์ถามให้อนุญาตการเข้าถึงเครือข่ายในเครื่อง หรือกด Open website ในหน้าต่าง Home Server'); }
   const health = response.ok ? await response.json().catch(() => null) : null;
   if (health?.service !== 'melody-tab' || health?.version !== 1) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อมเชื่อมต่อเว็บนี้ — ปิดแล้วเปิด Home Server เวอร์ชันล่าสุดใหม่');
   return origin;

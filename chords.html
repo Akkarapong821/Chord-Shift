@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="./device-access.js"></script>
+  <style>.phone-device [data-desktop-only] { display: none !important; }</style>
   <title>Chord Shift — เปลี่ยนคีย์คอร์ดจากรูป</title>
   <meta name="description" content="ใส่รูปคอร์ดเพลงแล้วเปลี่ยนคีย์ได้ทันที ฟรี ทำงานในเครื่อง ไม่อัปโหลดรูป" />
   <meta name="theme-color" content="#12100e" />
@@ -13,7 +15,7 @@
   <div class="wrap">
     <header class="top">
       <a class="brand" href="./chords.html">🎸 Chord <span class="accent">Shift</span></a>
-      <a class="nav-link" href="./index.html?page=melody">Melody Tab →</a>
+      <a class="nav-link" data-desktop-only href="./index.html?page=melody">Melody Tab →</a>
     </header>
 
     <!-- 1. Start ------------------------------------------------------------>

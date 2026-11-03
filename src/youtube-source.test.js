@@ -21,7 +21,6 @@ test('hosted pages use the home server while local pages use their own API', () 
   assert.equal(defaultYouTubeSource('akkarapong821.github.io'), 'home');
   assert.equal(defaultYouTubeSource('127.0.0.1'), 'server');
   assert.equal(defaultYouTubeSource('localhost'), 'server');
-  assert.equal(defaultYouTubeSource('home.example.ts.net'), 'server');
   const video = 'https://youtube.com/watch?v=z164pDlYtOk&list=test';
   const url = new URL(youtubeRequestUrl(video, 'helper'));
   assert.equal(url.origin, 'http://127.0.0.1:39841');
@@ -29,11 +28,13 @@ test('hosted pages use the home server while local pages use their own API', () 
   assert.ok(youtubeRequestUrl(video, 'server').startsWith('/api/youtube?'));
 });
 
-test('home server URLs accept the private link or shared GitHub link and reject unsafe targets', async () => {
-  const home = 'https://home.example.ts.net:8443';
+test('desktop server URLs accept only this computer and reject retired phone links', async () => {
+  const home = 'http://127.0.0.1:39842';
   assert.equal(normalizeHomeServer(`${home}/index.html?page=melody`), home);
   assert.equal(normalizeHomeServer(`https://akkarapong821.github.io/Chord-Shift/index.html?page=melody&home=${encodeURIComponent(home)}`), home);
-  for (const value of ['http://home.ts.net', 'https://home.ts.net.evil.test', 'https://user:pass@home.ts.net', 'javascript:alert(1)', '']) {
+  assert.equal(normalizeHomeServer('http://localhost:39842/'), 'http://localhost:39842');
+  assert.equal(normalizeHomeServer('http://[::1]:39842/'), 'http://[::1]:39842');
+  for (const value of ['https://home.example.ts.net:8443', 'http://192.168.1.20:39842', 'https://127.0.0.1.evil.test', 'http://user:pass@localhost:39842', 'javascript:alert(1)', '']) {
     assert.throws(() => normalizeHomeServer(value));
   }
   const request = new URL(youtubeRequestUrl('https://youtu.be/z164pDlYtOk', 'home', home));
