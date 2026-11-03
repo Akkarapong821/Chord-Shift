@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultYouTubeSource, youtubeRequestUrl, checkYouTubeHelper, youtubePreviewUrl } from './youtube-source.js';
+import { defaultYouTubeSource, youtubeRequestUrl, checkYouTubeHelper, youtubePreviewUrl, normalizeHomeServer, checkHomeServer } from './youtube-source.js';
 
 test('YouTube preview plays the selected interval with an absolute stop time', () => {
   const preview = new URL(youtubePreviewUrl('https://youtu.be/z164pDlYtOk?t=5', { start: 85, end: 95 }));
@@ -16,8 +16,9 @@ test('YouTube preview plays the selected interval with an absolute stop time', (
   }
 });
 
-test('hosted pages use the helper while development keeps its local API', () => {
-  assert.equal(defaultYouTubeSource('chord-shift.onrender.com'), 'helper');
+test('hosted pages use the home server while local pages use their own API', () => {
+  assert.equal(defaultYouTubeSource('chord-shift.onrender.com'), 'home');
+  assert.equal(defaultYouTubeSource('akkarapong821.github.io'), 'home');
   assert.equal(defaultYouTubeSource('127.0.0.1'), 'server');
   assert.equal(defaultYouTubeSource('localhost'), 'server');
   assert.equal(defaultYouTubeSource('home.example.ts.net'), 'server');
@@ -26,6 +27,21 @@ test('hosted pages use the helper while development keeps its local API', () => 
   assert.equal(url.origin, 'http://127.0.0.1:39841');
   assert.equal(url.searchParams.get('url'), video);
   assert.ok(youtubeRequestUrl(video, 'server').startsWith('/api/youtube?'));
+});
+
+test('home server URLs accept the private link or shared GitHub link and reject unsafe targets', async () => {
+  const home = 'https://home.example.ts.net:8443';
+  assert.equal(normalizeHomeServer(`${home}/index.html?page=melody`), home);
+  assert.equal(normalizeHomeServer(`https://akkarapong821.github.io/Chord-Shift/index.html?page=melody&home=${encodeURIComponent(home)}`), home);
+  for (const value of ['http://home.ts.net', 'https://home.ts.net.evil.test', 'https://user:pass@home.ts.net', 'javascript:alert(1)', '']) {
+    assert.throws(() => normalizeHomeServer(value));
+  }
+  const request = new URL(youtubeRequestUrl('https://youtu.be/z164pDlYtOk', 'home', home));
+  assert.equal(request.origin, home);
+  assert.equal(request.pathname, '/api/youtube');
+  assert.equal(await checkHomeServer(home, async () => Response.json({ service: 'melody-tab', version: 1 })), home);
+  await assert.rejects(checkHomeServer(home, async () => { throw new Error('offline'); }), /Server ON/);
+  await assert.rejects(checkHomeServer(home, async () => Response.json({ service: 'other' })), /เวอร์ชันล่าสุด/);
 });
 
 test('health check verifies the helper identity and reports missing, blocked and busy helpers', async () => {

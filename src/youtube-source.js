@@ -23,11 +23,33 @@ export function youtubePreviewUrl(value, range) {
 }
 
 export function defaultYouTubeSource(hostname) {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.ts.net') ? 'server' : 'helper';
+  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.ts.net') ? 'server' : 'home';
 }
 
-export function youtubeRequestUrl(videoUrl, source) {
-  return `${source === 'helper' ? HELPER_URL : ''}/api/youtube?url=${encodeURIComponent(videoUrl)}`;
+export function normalizeHomeServer(value) {
+  try {
+    let url = new URL(value);
+    if (url.origin === 'https://akkarapong821.github.io' && url.pathname === '/Chord-Shift/index.html' && url.searchParams.has('home')) {
+      url = new URL(url.searchParams.get('home'));
+    }
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.ts.net') || url.username || url.password) throw new Error();
+    return url.origin;
+  } catch { throw new Error('วางลิงก์คอมบ้านจากปุ่ม Copy phone link ในหน้าต่าง Home Server ก่อนครับ'); }
+}
+
+export async function checkHomeServer(value, fetchRequest = fetch) {
+  const origin = normalizeHomeServer(value);
+  let response;
+  try { response = await fetchRequest(`${origin}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
+  catch { throw new Error('ยังเชื่อมต่อคอมบ้านไม่ได้ — ตรวจว่า Server ON และ Tailscale เชื่อมต่ออยู่ หากเบราว์เซอร์ถามให้อนุญาตการเข้าถึงเครือข่ายในเครื่อง'); }
+  const health = response.ok ? await response.json().catch(() => null) : null;
+  if (health?.service !== 'melody-tab' || health?.version !== 1) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อมเชื่อมต่อเว็บนี้ — ปิดแล้วเปิด Home Server เวอร์ชันล่าสุดใหม่');
+  return origin;
+}
+
+export function youtubeRequestUrl(videoUrl, source, homeServer) {
+  const base = source === 'home' ? normalizeHomeServer(homeServer) : source === 'helper' ? HELPER_URL : '';
+  return `${base}/api/youtube?url=${encodeURIComponent(videoUrl)}`;
 }
 
 export async function checkYouTubeHelper(fetchRequest = fetch) {

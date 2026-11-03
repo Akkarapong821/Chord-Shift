@@ -44,6 +44,18 @@ test('guitar mode rejects missing or excessive ranges before downloading', async
   }
 });
 
+test('whole-song guitar listening returns the full stem independently of the TAB interval', async (t) => {
+  const wave = Buffer.from('RIFF0000WAVEwhole-song-guitar');
+  const response = await request(t, { separate: async (_audio, range) => {
+    assert.deepEqual(range, { start: 0, end: null, full: true }); return wave;
+  } }, videoUrl, '&isolate=guitar&full=1&start=196&end=211');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-audio-start'), '0');
+  assert.equal(response.headers.get('x-audio-full-song'), '1');
+  assert.equal(response.headers.get('content-type'), 'audio/wav');
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), wave);
+});
+
 test('failed separation never silently substitutes the full mix', async (t) => {
   const response = await request(t, { separate: async () => { throw Object.assign(new Error('missing'), { code: 'guitar-not-installed', status: 503 }); } }, videoUrl, '&isolate=guitar&start=85&end=90');
   assert.equal(response.status, 503);

@@ -1,4 +1,4 @@
-param([switch]$SmokeTest, [switch]$TestYouTube)
+param([switch]$SmokeTest, [switch]$TestYouTube, [switch]$ResumeSession)
 $ErrorActionPreference = 'Stop'
 $projectDir = Split-Path -Parent $PSScriptRoot
 $tailscalePath = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
@@ -111,6 +111,7 @@ function Start-HomeServer {
         Start-Sleep -Milliseconds 1500
         if ($script:serveProcess.HasExited) { throw 'Tailscale Serve could not start. See .tools/home-tailscale-error.log' }
         $script:phoneUrl = "https://${dnsName}:8443/index.html?page=melody"
+        $script:websiteUrl = 'https://akkarapong821.github.io/Chord-Shift/index.html?page=melody&home=' + [Uri]::EscapeDataString($script:phoneUrl)
     } catch { Stop-HomeServer; throw }
 }
 
@@ -181,7 +182,7 @@ $helpLabel.Location = New-Object System.Drawing.Point(20, 195)
 $helpLabel.Size = New-Object System.Drawing.Size(580, 55)
 $form.Controls.Add($helpLabel)
 function Show-ServerOn {
-    $urlBox.Text = $script:phoneUrl
+    $urlBox.Text = $script:websiteUrl
     $statusLabel.Text = 'Server ON - click Open website to use Melody Tab.'
     $startButton.Enabled = $false; $stopButton.Enabled = $true; $copyButton.Enabled = $true; $openButton.Enabled = $true
 }
@@ -202,12 +203,12 @@ $stopButton.Add_Click({
     $statusLabel.Text = 'Server OFF - click Start server when you want to use it.'
     $startButton.Enabled = $true; $stopButton.Enabled = $false; $copyButton.Enabled = $false; $openButton.Enabled = $false
 })
-$copyButton.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($script:phoneUrl) })
-$openButton.Add_Click({ Start-Process $script:phoneUrl })
+$copyButton.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($script:websiteUrl) })
+$openButton.Add_Click({ Start-Process $script:websiteUrl })
 $form.Add_FormClosing({ Stop-HomeServer })
 # A previous crashed controller can leave its children running. Recover that
 # session; a fresh launch without an existing server still stays OFF.
-if (Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue) {
+if ($ResumeSession -or (Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue)) {
     try { Start-HomeServer; Show-ServerOn }
     catch { $statusLabel.Text = 'Server OFF - ' + $_.Exception.Message }
 }

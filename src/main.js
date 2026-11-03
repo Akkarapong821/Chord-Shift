@@ -5,7 +5,7 @@ import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
-import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl } from './youtube-source.js';
+import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, normalizeHomeServer, checkHomeServer } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
 
 const $ = (id) => document.getElementById(id);
@@ -128,6 +128,30 @@ fileInput.addEventListener('change', () => {
 const ytUrl = $('yt-url');
 const ytBtn = $('yt-btn');
 const ytSource = $('yt-source');
+const homeServerInput = $('home-server-url');
+let connectedHome = '';
+try { homeServerInput.value = localStorage.getItem('melody-home-server') || ''; } catch { }
+const homeParam = new URL(location.href).searchParams.get('home');
+if (homeParam) {
+  try { homeServerInput.value = normalizeHomeServer(homeParam); }
+  catch (error) { $('home-status').textContent = error.message; }
+  const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('home');
+  history.replaceState(null, '', cleanUrl);
+}
+async function connectHome() {
+  $('connect-home-btn').disabled = true;
+  $('home-status').textContent = 'กำลังเชื่อมต่อคอมบ้าน…';
+  try {
+    connectedHome = await checkHomeServer(homeServerInput.value.trim());
+    try { localStorage.setItem('melody-home-server', connectedHome); } catch { }
+    $('home-status').textContent = 'เชื่อมต่อคอมบ้านแล้ว · วางลิงก์ YouTube และแกะ TAB จากหน้านี้ได้เลย';
+    return connectedHome;
+  } catch (error) {
+    connectedHome = ''; $('home-status').textContent = error.message; throw error;
+  } finally { $('connect-home-btn').disabled = busy; }
+}
+homeServerInput.addEventListener('input', () => { connectedHome = ''; $('home-status').textContent = 'กดเชื่อมต่อคอมบ้านเพื่อใช้ลิงก์นี้'; });
+$('connect-home-btn').addEventListener('click', () => connectHome().catch(() => {}));
 $('cancel-youtube-btn').addEventListener('click', () => youtubeAbort?.abort());
 function stopYouTubePreview() {
   $('yt-preview').removeAttribute('src');
@@ -162,14 +186,18 @@ updateYouTubeRangeSummary();
 ytSource.value = defaultYouTubeSource(location.hostname);
 function updateYouTubeSource() {
   const helper = ytSource.value === 'helper';
+  $('home-connection').hidden = ytSource.value !== 'home';
   $('check-helper-btn').hidden = !helper;
-  $('yt-source-help').textContent = helper
+  $('yt-source-help').textContent = ytSource.value === 'home'
+    ? 'ดึงเสียงและแยกกีตาร์ผ่านคอมบ้านที่เชื่อมต่อไว้ ต้องเปิดคอมและ Tailscale ขณะใช้งาน'
+    : helper
     ? 'หากเปิด start-youtube-helper.cmd ให้กด Start server แล้วกด Open website ในหน้าต่าง Home Server และใช้งานจากเว็บคอมบ้านที่เปิดขึ้นมา'
     : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';
   $('helper-status').textContent = '';
 }
 ytSource.addEventListener('change', updateYouTubeSource);
 updateYouTubeSource();
+if (ytSource.value === 'home' && homeServerInput.value) connectHome().catch(() => {});
 $('check-helper-btn').addEventListener('click', async () => {
   $('check-helper-btn').disabled = true;
   $('helper-status').textContent = 'กำลังเชื่อมต่อตัวช่วย…';
@@ -210,10 +238,6 @@ async function handleYouTube() {
   if (!url || busy) return;
   if (!validateTimeInputs()) return;
   const isolateGuitar = $('guitar-isolation').checked;
-  const guitarRange = readAudioRange(timeStart.value, timeEnd.value);
-  if (isolateGuitar && (!Number.isFinite(guitarRange.end) || guitarRange.end - guitarRange.start > 60)) {
-    showError(YT_ERRORS['guitar-range-invalid']); return;
-  }
   decodedAudio = null;
   sourceOffset = 0;
   $('source-section').hidden = true;
@@ -222,19 +246,20 @@ async function handleYouTube() {
   resultSection.style.display = 'none';
   progressSection.style.display = 'block';
   ytBtn.disabled = true;
-  setProgress(0, isolateGuitar ? 'กำลังดึงเพลงและแยกเสียงกีตาร์บนคอมบ้าน… อาจใช้เวลาหลายนาที' : 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
+  setProgress(0, isolateGuitar ? 'กำลังดึงและแยกกีตาร์ทั้งเพลงบนคอมบ้าน… เมื่อเสร็จจะแกะ TAB เฉพาะช่วงที่เลือก อาจรอหลายนาที' : 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
   const aborter = new AbortController();
   youtubeAbort = aborter;
   $('cancel-youtube-btn').hidden = !isolateGuitar;
-  const requestTimer = setTimeout(() => aborter.abort(new DOMException('Timed out', 'TimeoutError')), isolateGuitar ? 16 * 60 * 1000 : 75000);
+  const requestTimer = setTimeout(() => aborter.abort(new DOMException('Timed out', 'TimeoutError')), isolateGuitar ? 61 * 60 * 1000 : 75000);
 
   try {
+    if (ytSource.value === 'home') await connectHome();
     if (ytSource.value === 'helper') {
       await checkYouTubeHelper();
       $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · กำลังดึงเสียงผ่านเครื่องนี้';
     }
-    let requestUrl = youtubeRequestUrl(url, ytSource.value);
-    if (isolateGuitar) requestUrl += `&isolate=guitar&start=${guitarRange.start}&end=${guitarRange.end}`;
+    let requestUrl = youtubeRequestUrl(url, ytSource.value, connectedHome);
+    if (isolateGuitar) requestUrl += '&isolate=guitar&full=1';
     const res = await fetch(requestUrl, { signal: aborter.signal });
     if (!res.ok) {
       const code = (await res.text()).trim();
@@ -274,7 +299,7 @@ async function handleYouTube() {
     if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงผ่านตัวช่วยสำเร็จ';
     $('cancel-youtube-btn').hidden = true;
     progressSection.style.display = 'none';
-    await processFile(file, { offset, separated });
+    await processFile(file, { offset, separated, fullSong: res.headers.get('X-Audio-Full-Song') === '1' });
   } catch (err) {
     console.error(err);
     progressSection.style.display = 'none';
@@ -313,6 +338,8 @@ function setBusy(on) {
   ytSource.disabled = on;
   $('yt-preview-btn').disabled = on;
   $('check-helper-btn').disabled = on;
+  $('connect-home-btn').disabled = on;
+  homeServerInput.disabled = on;
   $('guitar-isolation').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
@@ -329,7 +356,7 @@ function setBusy(on) {
   }
 }
 
-async function processFile(file, { offset = 0, separated = false } = {}) {
+async function processFile(file, { offset = 0, separated = false, fullSong = false } = {}) {
   currentFile = file;
   sourceOffset = offset;
   isolatedSource = separated;
@@ -347,7 +374,8 @@ async function processFile(file, { offset = 0, separated = false } = {}) {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(file);
     originalAudio.src = sourceUrl;
-    $('audio-source-label').textContent = separated ? 'ฟังเฉพาะเสียงกีตาร์ที่แยกได้' : 'ฟังเสียงต้นฉบับเทียบกับแท็บ';
+    $('audio-source-label').textContent = separated ? fullSong ? 'ฟังเฉพาะเสียงกีตาร์ทั้งเพลง' : 'ฟังเฉพาะเสียงกีตาร์ที่แยกได้' : 'ฟังเสียงต้นฉบับเทียบกับแท็บ';
+    $('guitar-audio-download').textContent = fullSong ? 'ดาวน์โหลดเสียงกีตาร์ทั้งเพลง .wav' : 'ดาวน์โหลดเสียงกีตาร์ .wav';
     $('guitar-audio-download').hidden = !separated;
     $('guitar-audio-download').href = sourceUrl;
     $('guitar-audio-download').download = file.name;

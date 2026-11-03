@@ -9,6 +9,7 @@ os.environ.setdefault("TORCH_HOME", str(ROOT / ".tools" / "guitar-models"))
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--prepare", action="store_true")
+    parser.add_argument("--full", action="store_true")
     parser.add_argument("--input")
     parser.add_argument("--output")
     parser.add_argument("--start", type=float, default=0)
@@ -22,7 +23,7 @@ def main():
         assert "guitar" in model.sources
         print("Guitar separation model ready", flush=True)
         return
-    if not args.input or not args.output or args.end is None or not (0 <= args.start < args.end <= 900) or args.end - args.start > 60:
+    if not args.input or not args.output or (not args.full and (args.end is None or not (0 <= args.start < args.end <= 900) or args.end - args.start > 60)):
         raise ValueError("Choose a guitar clip from 0.1 to 60 seconds")
     import subprocess
     import numpy as np
@@ -30,24 +31,26 @@ def main():
     import imageio_ffmpeg
     from demucs.apply import apply_model
     import torchaudio.functional as audio_functions
+    selection_args = ["-t", "900"] if args.full else ["-ss", str(args.start), "-t", str(args.end - args.start)]
     result = subprocess.run([
         imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-i", args.input,
-        "-ss", str(args.start), "-t", str(args.end - args.start),
+        *selection_args,
         "-f", "f32le", "-ar", str(model.samplerate), "-ac", "2", "pipe:1",
     ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     samples = np.frombuffer(result.stdout, dtype="<f4").reshape(-1, 2).copy()
-    if len(samples) < int((args.end - args.start) * model.samplerate) - model.samplerate // 10:
+    if not args.full and len(samples) < int((args.end - args.start) * model.samplerate) - model.samplerate // 10:
         raise ValueError("Selected range extends beyond the available audio")
     if len(samples) < model.samplerate // 10:
         raise ValueError("Empty audio clip")
     wav = torch.from_numpy(samples.T)
+    print(f"Separating guitar: {len(samples) / model.samplerate:.1f} seconds", flush=True)
     reference = wav.mean(0)
     mean = reference.mean()
     deviation = reference.std().clamp_min(1e-6)
     with torch.inference_mode():
         sources = apply_model(model, ((wav - mean) / deviation)[None],
                               device="cpu", shifts=0, split=True, overlap=0.25,
-                              segment=5, progress=False)[0]
+                              segment=5, progress=args.full)[0]
         guitar = sources[model.sources.index("guitar")] * deviation + mean
         mono = audio_functions.resample(guitar.mean(0), model.samplerate, 22050)
     peak = mono.abs().max().item()

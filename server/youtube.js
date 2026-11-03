@@ -91,14 +91,15 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, s
       if (controller.signal.aborted) throw fail('download-timeout', 504);
       if (!audio.length) throw fail('incomplete-audio');
       if (guitar) {
-        if (info?.basic_info?.duration && range.end > Number(info.basic_info.duration)) throw fail('guitar-range-invalid', 422);
+        if (!range.full && info?.basic_info?.duration && range.end > Number(info.basic_info.duration)) throw fail('guitar-range-invalid', 422);
         clearTimeout(timeout);
-        timeout = setTimeout(cancel, 15 * 60 * 1000);
+        timeout = setTimeout(cancel, (range.full ? 60 : 15) * 60 * 1000);
         audio = await abortable(separate(audio, range, controller.signal), controller.signal);
         res.setHeader('X-Audio-Start', String(range.start));
         res.setHeader('X-Audio-Isolation', 'guitar');
+        if (range.full) res.setHeader('X-Audio-Full-Song', '1');
       }
-      if (audio.length > MAX_AUDIO_BYTES) throw fail('audio-too-large', 413);
+      if (audio.length > (guitar ? 64 * 1024 * 1024 : MAX_AUDIO_BYTES)) throw fail('audio-too-large', 413);
       res.writeHead(200, {
         'Content-Type': guitar ? 'audio/wav' : 'audio/mp4',
         'Content-Length': audio.length,

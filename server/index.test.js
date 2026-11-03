@@ -49,6 +49,25 @@ test('routes YouTube requests to the API handler instead of static 404', async (
   assert.equal(await response.text(), 'invalid-url');
 });
 
+test('GitHub Pages can connect to the home API, including private-network preflight', async (t) => {
+  const base = await withServer(t, createAppServer({ youtubeHandler: (_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'audio/wav', 'X-Audio-Start': '0', 'X-Audio-Full-Song': '1' }); res.end('guitar');
+  } }));
+  const origin = 'https://akkarapong821.github.io';
+  const health = await fetch(`${base}/api/health`, { headers: { Origin: origin } });
+  assert.equal(health.status, 200);
+  assert.equal(health.headers.get('access-control-allow-origin'), origin);
+  const audio = await fetch(`${base}/api/youtube?url=test`, { headers: { Origin: origin } });
+  assert.match(audio.headers.get('access-control-expose-headers'), /X-Audio-Full-Song/);
+  assert.equal(await audio.text(), 'guitar');
+  const preflight = await fetch(`${base}/api/youtube`, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Private-Network': 'true' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-private-network'), 'true');
+  const foreign = await fetch(`${base}/api/youtube?url=test`, { headers: { Origin: 'https://evil.example' } });
+  assert.equal(foreign.status, 403);
+  assert.equal(foreign.headers.get('access-control-allow-origin'), null);
+});
+
 test('rejects unsupported methods and paths outside the built site', async (t) => {
   const distDir = await mkdtemp(join(tmpdir(), 'melody-tab-dist-'));
   t.after(() => rm(distDir, { recursive: true, force: true }));

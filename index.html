@@ -137,6 +137,16 @@
       <p><a href="./chords.html" style="color: var(--accent); font-size: 14px;">มีรูปคอร์ดเพลง? เปลี่ยนคีย์ด้วย Chord Shift →</a></p>
     </header>
 
+    <div class="panel" id="home-connection" hidden>
+      <h2>เชื่อมต่อเซิร์ฟเวอร์คอมบ้าน</h2>
+      <label for="home-server-url" class="note">ลิงก์จากหน้าต่าง Home Server</label>
+      <div class="yt-row" style="margin-top:8px;">
+        <input id="home-server-url" type="url" placeholder="https://ชื่อคอม.ts.net:8443/…" />
+        <button id="connect-home-btn">เชื่อมต่อคอมบ้าน</button>
+      </div>
+      <p class="note" id="home-status" role="status">กด Copy phone link ในหน้าต่าง Home Server แล้ววางลิงก์ที่นี่เพียงครั้งเดียว เว็บจะจำไว้ให้</p>
+    </div>
+
     <div class="panel">
       <h2>วางลิงก์ YouTube และเลือกช่วงโซโล่</h2>
       <label for="yt-url" class="note">ลิงก์เพลง YouTube</label>
@@ -158,7 +168,7 @@
       <p class="note" id="time-help">ใส่เวลาแบบ 1:25 หรือ 85 วินาที · เว้นเวลาสิ้นสุดว่างเพื่อแกะจนจบเพลง<br>เลือกช่วงก่อนอัปโหลดหรือดึงจาก YouTube ได้ หลังโหลดเพลงแล้วเปลี่ยนช่วงและแกะใหม่ได้ทันที</p>
       <p id="yt-range-summary" class="note" aria-live="polite">เริ่ม 0:00 → จบเพลง</p>
       <label class="toggle"><input type="checkbox" id="guitar-isolation" />แยกเสียงกีตาร์ก่อนแกะ TAB</label>
-      <p class="note">ใช้คอมบ้านแยกกีตาร์จากร้อง เบส และกลอง · ต้องระบุเวลาเริ่ม–หยุดครั้งละไม่เกิน 60 วินาที · อาจใช้เวลาหลายนาทีและยังมีเสียงอื่นปนได้</p>
+      <p class="note">แยกกีตาร์ทั้งเพลงเพื่อฟังและดาวน์โหลด แล้วแกะ TAB เฉพาะเวลาเริ่ม–หยุดที่เลือก · ใช้คอมบ้านประมวลผล อาจรอหลายนาทีและยังมีเสียงอื่นปนได้</p>
       <div class="toolbar time-actions">
         <button id="yt-preview-btn">▶ ฟังช่วงนี้บน YouTube</button>
         <button id="yt-preview-stop-btn" disabled hidden>■ หยุดฟัง</button>
@@ -179,6 +189,7 @@
         <div class="control">
           <label for="yt-source">ดึงเสียง YouTube ผ่าน</label>
           <select id="yt-source">
+            <option value="home">เซิร์ฟเวอร์คอมบ้าน</option>
             <option value="helper">ตัวช่วยบนเครื่องนี้</option>
             <option value="server">เซิร์ฟเวอร์เว็บ</option>
           </select>

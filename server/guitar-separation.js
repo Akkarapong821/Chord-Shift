@@ -11,6 +11,7 @@ let active = false;
 const fail = (code, status = 422) => Object.assign(new Error(code), { code, status });
 
 export function guitarRange(params) {
+  if (params.get('full') === '1') return { start: 0, end: null, full: true };
   const start = Number(params.get('start') || 0);
   const endText = params.get('end');
   const end = Number(endText);
@@ -32,8 +33,9 @@ export async function separateGuitar(audio, range, signal) {
     await writeFile(input, audio);
     if (signal.aborted) throw fail('guitar-cancelled');
     await new Promise((resolve, reject) => {
+      const selectionArgs = range.full ? ['--full'] : ['--start', String(range.start), '--end', String(range.end)];
       const child = spawn(guitarPython, [join(root, 'scripts/separate-guitar.py'), '--input', input,
-        '--output', output, '--start', String(range.start), '--end', String(range.end)], {
+        '--output', output, ...selectionArgs], {
         windowsHide: true, shell: false, stdio: ['ignore', 'ignore', 'pipe'],
       });
       let detail = '';

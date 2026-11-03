@@ -21,7 +21,10 @@ function sendText(res, status, message) {
   res.end(message);
 }
 
-export function createAppServer({ distDir = defaultDistDir, youtubeHandler = createYouTubeHandler() } = {}) {
+export function createAppServer({ distDir = defaultDistDir, youtubeHandler = createYouTubeHandler(), allowedOrigins = [
+  'https://akkarapong821.github.io', 'https://chord-shift.onrender.com',
+  'http://127.0.0.1:5173', 'http://localhost:5173',
+] } = {}) {
   const root = resolve(distDir);
   return createServer((req, res) => {
     let pathname;
@@ -30,6 +33,24 @@ export function createAppServer({ distDir = defaultDistDir, youtubeHandler = cre
     } catch {
       sendText(res, 400, 'bad-request');
       return;
+    }
+
+    if (pathname.startsWith('/api/')) {
+      const origin = req.headers.origin;
+      if ((origin && !allowedOrigins.includes(origin)) || (!origin && req.headers['sec-fetch-site'] === 'cross-site')) {
+        sendText(res, 403, 'forbidden-origin'); return;
+      }
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Expose-Headers', 'X-Video-Title, X-Audio-Start, X-Audio-Isolation, X-Audio-Full-Song, Content-Length');
+      }
+      if (req.method === 'OPTIONS') {
+        if (!origin || req.headers['access-control-request-method'] !== 'GET') { sendText(res, 403, 'forbidden-preflight'); return; }
+        res.setHeader('Access-Control-Allow-Methods', 'GET');
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        res.writeHead(204); res.end(); return;
+      }
     }
 
     if (pathname === '/api/health' && req.method === 'GET') {
