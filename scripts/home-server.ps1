@@ -8,6 +8,35 @@ $script:serveProcess = $null
 $script:phoneUrl = ''
 $logDir = Join-Path $projectDir '.tools'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+$script:windowMutex = $null
+$controllerPidFile = Join-Path $logDir 'home-controller.pid'
+if (-not $SmokeTest) {
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    try { $rootHash = [BitConverter]::ToString($hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($projectDir.ToLowerInvariant()))).Replace('-', '').Substring(0, 16) }
+    finally { $hasher.Dispose() }
+    $script:windowMutex = New-Object System.Threading.Mutex($false, ('Local\MelodyTabHome-' + $rootHash))
+    try { $ownsWindow = $script:windowMutex.WaitOne(0) }
+    catch [System.Threading.AbandonedMutexException] { $ownsWindow = $true }
+    if (-not $ownsWindow) {
+        # A second launch brings back this project's existing control window.
+        # It never starts another web server or changes another app's port.
+        if (Test-Path -LiteralPath $controllerPidFile) {
+            $ownerPid = [int]([IO.File]::ReadAllText($controllerPidFile).Trim())
+            $ownerInfo = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $ownerPid) -ErrorAction SilentlyContinue
+            if ($ownerInfo -and $ownerInfo.CommandLine.Contains((Join-Path $PSScriptRoot 'home-server.ps1'))) {
+                $ownerProcess = Get-Process -Id $ownerPid -ErrorAction SilentlyContinue
+                if ($ownerProcess -and $ownerProcess.MainWindowHandle -ne [IntPtr]::Zero) {
+                    Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class MelodyHomeWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int command); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); }'
+                    [MelodyHomeWindow]::ShowWindowAsync($ownerProcess.MainWindowHandle, 9) | Out-Null
+                    [MelodyHomeWindow]::SetForegroundWindow($ownerProcess.MainWindowHandle) | Out-Null
+                }
+            }
+        }
+        $script:windowMutex.Dispose()
+        exit
+    }
+    [IO.File]::WriteAllText($controllerPidFile, [string]$PID)
+}
 
 function Stop-HomeServer {
     # These handles belong only to processes created by this window.
@@ -37,9 +66,30 @@ function Start-HomeServer {
     $serveJson = & $tailscalePath serve status --json 2>$null
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing Tailscale services.' }
     $serveConfig = $serveJson | ConvertFrom-Json
-    if ($serveConfig.TCP.'8443') { throw 'Tailscale port 8443 is already used. Stop the previous home-server window first.' }
-    $portUsed = Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue
-    if ($portUsed) { throw 'Port 39842 is already used. Close the previous home-server window first.' }
+    $portUsed = Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($portUsed) {
+        # Recover only an orphaned server proven to serve this project's exact
+        # build. Never kill an unknown service just because it uses our port.
+        $webInfo = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $portUsed.OwningProcess)
+        $oldParent = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $webInfo.ParentProcessId) -ErrorAction SilentlyContinue
+        $sameBuild = $false
+        try {
+            $health = Invoke-RestMethod 'http://127.0.0.1:39842/api/health' -TimeoutSec 3
+            $page = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:39842/index.html?page=melody' -TimeoutSec 3
+            $sameBuild = $health.service -eq 'melody-tab' -and $page.Content -eq [IO.File]::ReadAllText((Join-Path $projectDir 'dist/index.html'))
+        } catch { }
+        $oldServe = Get-CimInstance Win32_Process -Filter "name='tailscale.exe'" | Where-Object {
+            $_.ParentProcessId -eq $webInfo.ParentProcessId -and $_.CommandLine -match 'serve --https=8443 --bg=false http://127\.0\.0\.1:39842'
+        } | Select-Object -First 1
+        if ($sameBuild -and $webInfo.Name -eq 'node.exe' -and $webInfo.CommandLine -match 'server[\\/]index\.js' -and -not $oldParent -and $oldServe) {
+            $script:webProcess = Get-Process -Id $webInfo.ProcessId
+            $script:serveProcess = Get-Process -Id $oldServe.ProcessId
+            Stop-HomeServer
+            Start-Sleep -Milliseconds 700
+        } else {
+            throw 'Another application or home-server window is using port 39842. The existing service was left running.'
+        }
+    } elseif ($serveConfig.TCP.'8443') { throw 'Tailscale port 8443 is already used by another service.' }
     try {
         $oldPort = $env:PORT; $oldBind = $env:HOST
         try {
@@ -130,15 +180,18 @@ $helpLabel.Text = 'Keep this window open. Connect Tailscale on your phone using 
 $helpLabel.Location = New-Object System.Drawing.Point(20, 195)
 $helpLabel.Size = New-Object System.Drawing.Size(580, 55)
 $form.Controls.Add($helpLabel)
+function Show-ServerOn {
+    $urlBox.Text = $script:phoneUrl
+    $statusLabel.Text = 'Server ON - click Open website to use Melody Tab.'
+    $startButton.Enabled = $false; $stopButton.Enabled = $true; $copyButton.Enabled = $true; $openButton.Enabled = $true
+}
 $startButton.Add_Click({
     $startButton.Enabled = $false
     $statusLabel.Text = 'Starting...'
     $form.Refresh()
     try {
         Start-HomeServer
-        $urlBox.Text = $script:phoneUrl
-        $statusLabel.Text = 'Server ON - open the link on your phone with Tailscale connected.'
-        $stopButton.Enabled = $true; $copyButton.Enabled = $true; $openButton.Enabled = $true
+        Show-ServerOn
     } catch {
         $statusLabel.Text = 'Server OFF - ' + $_.Exception.Message
         $startButton.Enabled = $true
@@ -152,4 +205,13 @@ $stopButton.Add_Click({
 $copyButton.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($script:phoneUrl) })
 $openButton.Add_Click({ Start-Process $script:phoneUrl })
 $form.Add_FormClosing({ Stop-HomeServer })
-try { [void]$form.ShowDialog() } finally { Stop-HomeServer }
+# A previous crashed controller can leave its children running. Recover that
+# session; a fresh launch without an existing server still stays OFF.
+if (Get-NetTCPConnection -LocalPort 39842 -State Listen -ErrorAction SilentlyContinue) {
+    try { Start-HomeServer; Show-ServerOn }
+    catch { $statusLabel.Text = 'Server OFF - ' + $_.Exception.Message }
+}
+try { [void]$form.ShowDialog() } finally {
+    Stop-HomeServer
+    if ($script:windowMutex) { $script:windowMutex.ReleaseMutex(); $script:windowMutex.Dispose() }
+}
