@@ -27,29 +27,17 @@ export function defaultYouTubeSource(hostname) {
   return ['localhost', '127.0.0.1', '[::1]'].includes(hostname) ? 'server' : 'home';
 }
 
-export function normalizeHomeServer(value) {
-  try {
-    let url = new URL(value);
-    if (url.origin === 'https://akkarapong821.github.io' && url.pathname === '/Chord-Shift/index.html' && url.searchParams.has('home')) {
-      url = new URL(url.searchParams.get('home'));
-    }
-    if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password) throw new Error();
-    return url.origin;
-  } catch { throw new Error('ใช้ลิงก์เซิร์ฟเวอร์บนคอมนี้ เช่น http://127.0.0.1:39842 เท่านั้น'); }
-}
-
-export async function checkHomeServer(value, fetchRequest = fetch) {
-  const origin = normalizeHomeServer(value);
+export async function checkLocalServer(fetchRequest = fetch) {
   let response;
-  try { response = await fetchRequest(`${origin}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
-  catch { throw new Error('ยังเชื่อมต่อคอมนี้ไม่ได้ — ตรวจว่า Home Server ขึ้น Server ON หากเบราว์เซอร์ถามให้อนุญาตการเข้าถึงเครือข่ายในเครื่อง หรือกด Open website ในหน้าต่าง Home Server'); }
+  try { response = await fetchRequest(`${LOCAL_SERVER_URL}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
+  catch { throw new Error('เปิด start-youtube-helper.cmd บนคอมเครื่องนี้ แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย'); }
   const health = response.ok ? await response.json().catch(() => null) : null;
   if (health?.service !== 'melody-tab' || health?.version !== 1) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อมเชื่อมต่อเว็บนี้ — ปิดแล้วเปิด Home Server เวอร์ชันล่าสุดใหม่');
-  return origin;
+  return LOCAL_SERVER_URL;
 }
 
-export function youtubeRequestUrl(videoUrl, source, homeServer) {
-  const base = source === 'home' ? normalizeHomeServer(homeServer) : source === 'helper' ? HELPER_URL : '';
+export function youtubeRequestUrl(videoUrl, source) {
+  const base = source === 'home' ? LOCAL_SERVER_URL : source === 'helper' ? HELPER_URL : '';
   return `${base}/api/youtube?url=${encodeURIComponent(videoUrl)}`;
 }
 
@@ -58,7 +46,7 @@ export async function checkYouTubeHelper(fetchRequest = fetch) {
   try {
     response = await fetchRequest(`${HELPER_URL}/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
   } catch {
-    throw new Error('หน้านี้ยังเชื่อมต่อตัวช่วยไม่ได้ — เปิด start-youtube-helper.cmd แล้วกด Start server → Open website และแกะเพลงจากเว็บคอมบ้านที่เปิดขึ้นมาแทนหน้านี้');
+    throw new Error('เปิด start-youtube-helper.cmd แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย');
   }
   if (!response.ok) throw new Error('ตัวช่วยไม่อนุญาตให้เว็บนี้เชื่อมต่อ — โปรดอัปเดตตัวช่วยเป็นเวอร์ชันล่าสุด');
   const health = await response.json().catch(() => null);

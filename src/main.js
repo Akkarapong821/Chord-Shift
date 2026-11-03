@@ -5,7 +5,7 @@ import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
-import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, normalizeHomeServer, checkHomeServer, LOCAL_SERVER_URL } from './youtube-source.js';
+import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, checkLocalServer } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
 
 const $ = (id) => document.getElementById(id);
@@ -128,42 +128,11 @@ fileInput.addEventListener('change', () => {
 const ytUrl = $('yt-url');
 const ytBtn = $('yt-btn');
 const ytSource = $('yt-source');
-const homeServerInput = $('home-server-url');
-let connectedHome = '';
-homeServerInput.value = LOCAL_SERVER_URL;
-try {
-  const saved = localStorage.getItem('melody-home-server');
-  if (saved) homeServerInput.value = normalizeHomeServer(saved);
-} catch { /* Replace old phone/Tailscale links with the local desktop server. */ }
-const homeParam = new URL(location.href).searchParams.get('home');
-if (homeParam) {
-  try { homeServerInput.value = normalizeHomeServer(homeParam); }
-  catch { /* Old shared phone links now connect only to this computer. */ }
+// Old shared links no longer configure a connection; use this computer automatically.
+if (new URL(location.href).searchParams.has('home')) {
   const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('home');
   history.replaceState(null, '', cleanUrl);
 }
-function updateDirectHomeLink() {
-  try {
-    $('home-direct-link').href = normalizeHomeServer(homeServerInput.value.trim()) + '/index.html?page=melody';
-    $('home-direct-link').hidden = false;
-  } catch { $('home-direct-link').hidden = true; }
-}
-updateDirectHomeLink();
-async function connectHome() {
-  $('connect-home-btn').disabled = true;
-  $('home-status').textContent = 'กำลังเชื่อมต่อคอมนี้…';
-  updateDirectHomeLink();
-  try {
-    connectedHome = await checkHomeServer(homeServerInput.value.trim());
-    try { localStorage.setItem('melody-home-server', connectedHome); } catch { }
-    $('home-status').textContent = 'เชื่อมต่อคอมนี้แล้ว · วางลิงก์ YouTube และแกะ TAB จากหน้านี้ได้เลย';
-    return connectedHome;
-  } catch (error) {
-    connectedHome = ''; $('home-status').textContent = error.message; throw error;
-  } finally { $('connect-home-btn').disabled = busy; }
-}
-homeServerInput.addEventListener('input', () => { connectedHome = ''; updateDirectHomeLink(); $('home-status').textContent = 'กดเชื่อมต่อคอมนี้เพื่อใช้ลิงก์นี้'; });
-$('connect-home-btn').addEventListener('click', () => connectHome().catch(() => {}));
 $('cancel-youtube-btn').addEventListener('click', () => youtubeAbort?.abort());
 function stopYouTubePreview() {
   $('yt-preview').removeAttribute('src');
@@ -198,18 +167,16 @@ updateYouTubeRangeSummary();
 ytSource.value = defaultYouTubeSource(location.hostname);
 function updateYouTubeSource() {
   const helper = ytSource.value === 'helper';
-  $('home-connection').hidden = ytSource.value !== 'home';
   $('check-helper-btn').hidden = !helper;
   $('yt-source-help').textContent = ytSource.value === 'home'
-    ? 'ดึงเสียงและแยกกีตาร์บนคอมเครื่องนี้ เปิด Home Server แล้วกด Start server ก่อนใช้งาน'
+    ? 'ดึงเสียงและแยกกีตาร์บนคอมเครื่องนี้อัตโนมัติ ดับเบิลคลิก start-youtube-helper.cmd เพื่อเปิดพร้อมใช้งาน'
     : helper
-    ? 'หากเปิด start-youtube-helper.cmd ให้กด Start server แล้วกด Open website ในหน้าต่าง Home Server และใช้งานจากเว็บคอมบ้านที่เปิดขึ้นมา'
+    ? 'ดับเบิลคลิก start-youtube-helper.cmd แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย'
     : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';
   $('helper-status').textContent = '';
 }
 ytSource.addEventListener('change', updateYouTubeSource);
 updateYouTubeSource();
-if (ytSource.value === 'home' && homeServerInput.value) connectHome().catch(() => {});
 $('check-helper-btn').addEventListener('click', async () => {
   $('check-helper-btn').disabled = true;
   $('helper-status').textContent = 'กำลังเชื่อมต่อตัวช่วย…';
@@ -265,12 +232,12 @@ async function handleYouTube() {
   const requestTimer = setTimeout(() => aborter.abort(new DOMException('Timed out', 'TimeoutError')), isolateGuitar ? 61 * 60 * 1000 : 75000);
 
   try {
-    if (ytSource.value === 'home') await connectHome();
+    if (ytSource.value === 'home') await checkLocalServer();
     if (ytSource.value === 'helper') {
       await checkYouTubeHelper();
       $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · กำลังดึงเสียงผ่านเครื่องนี้';
     }
-    let requestUrl = youtubeRequestUrl(url, ytSource.value, connectedHome);
+    let requestUrl = youtubeRequestUrl(url, ytSource.value);
     if (isolateGuitar) requestUrl += '&isolate=guitar&full=1';
     const res = await fetch(requestUrl, { signal: aborter.signal });
     if (!res.ok) {
@@ -350,8 +317,6 @@ function setBusy(on) {
   ytSource.disabled = on;
   $('yt-preview-btn').disabled = on;
   $('check-helper-btn').disabled = on;
-  $('connect-home-btn').disabled = on;
-  homeServerInput.disabled = on;
   $('guitar-isolation').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
