@@ -164,7 +164,7 @@ function updateYouTubeSource() {
   const helper = ytSource.value === 'helper';
   $('check-helper-btn').hidden = !helper;
   $('yt-source-help').textContent = helper
-    ? 'เปิด start-youtube-helper.cmd ในโฟลเดอร์โปรเจกต์บนคอมเครื่องนี้ก่อนใช้งาน แล้วเปิดตัวช่วยค้างไว้ เสียงจะถูกดึงผ่านอินเทอร์เน็ตของเครื่องคุณ ไม่ผ่าน Render'
+    ? 'หากเปิด start-youtube-helper.cmd ให้กด Start server แล้วกด Open website ในหน้าต่าง Home Server และใช้งานจากเว็บคอมบ้านที่เปิดขึ้นมา'
     : 'ดึงเสียงผ่านเซิร์ฟเวอร์ที่เปิดเว็บนี้ หาก YouTube ขอการยืนยันว่าไม่ใช่บอต ให้เลือกตัวช่วยบนเครื่องนี้';
   $('helper-status').textContent = '';
 }

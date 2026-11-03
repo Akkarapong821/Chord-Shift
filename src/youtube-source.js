@@ -35,7 +35,7 @@ export async function checkYouTubeHelper(fetchRequest = fetch) {
   try {
     response = await fetchRequest(`${HELPER_URL}/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
   } catch {
-    throw new Error('ยังเชื่อมต่อตัวช่วยไม่ได้ — เปิด start-youtube-helper.cmd บนคอมเครื่องนี้ และอนุญาตการเข้าถึงเครือข่ายในเครื่องหากเบราว์เซอร์ถาม แล้วลองอีกครั้ง');
+    throw new Error('หน้านี้ยังเชื่อมต่อตัวช่วยไม่ได้ — เปิด start-youtube-helper.cmd แล้วกด Start server → Open website และแกะเพลงจากเว็บคอมบ้านที่เปิดขึ้นมาแทนหน้านี้');
   }
   if (!response.ok) throw new Error('ตัวช่วยไม่อนุญาตให้เว็บนี้เชื่อมต่อ — โปรดอัปเดตตัวช่วยเป็นเวอร์ชันล่าสุด');
   const health = await response.json().catch(() => null);
