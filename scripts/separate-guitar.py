@@ -1,4 +1,4 @@
-"""Local six-stem separation; only the requested guitar clip is saved."""
+"""Local separation: guitar alone, or aligned guitar/drums transport channels."""
 import argparse
 import os
 import hashlib
@@ -12,6 +12,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--prepare", action="store_true")
     parser.add_argument("--full", action="store_true")
+    parser.add_argument("--stems", choices=["guitar", "guitar,drums"], default="guitar")
     parser.add_argument("--input")
     parser.add_argument("--output")
     parser.add_argument("--start", type=float, default=0)
@@ -20,17 +21,18 @@ def main():
     cache_file = None
     if args.full and args.input and args.output:
         digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
-        cache_file = ROOT / '.tools' / 'guitar-cache' / f'guitar-{digest}-v1.wav'
+        cache_key = 'guitar' if args.stems == 'guitar' else 'guitar-drums'
+        cache_file = ROOT / '.tools' / 'guitar-cache' / f'{cache_key}-{digest}-v1.wav'
         if cache_file.is_file():
             shutil.copyfile(cache_file, args.output)
-            print('Cached full-song guitar saved', flush=True)
+            print('Cached full-song stems saved', flush=True)
             return
     import torch
     from demucs.pretrained import get_model
     torch.set_num_threads(min(4, os.cpu_count() or 2))
     model = get_model("htdemucs_6s").cpu().eval()
     if args.prepare:
-        assert "guitar" in model.sources
+        assert {"guitar", "drums"}.issubset(model.sources)
         print("Guitar separation model ready", flush=True)
         return
     if not args.input or not args.output or (not args.full and (args.end is None or not (0 <= args.start < args.end <= 900) or args.end - args.start > 60)):
@@ -53,7 +55,7 @@ def main():
     if len(samples) < model.samplerate // 10:
         raise ValueError("Empty audio clip")
     wav = torch.from_numpy(samples.T)
-    print(f"Separating guitar: {len(samples) / model.samplerate:.1f} seconds", flush=True)
+    print(f"Separating {args.stems}: {len(samples) / model.samplerate:.1f} seconds", flush=True)
     reference = wav.mean(0)
     mean = reference.mean()
     deviation = reference.std().clamp_min(1e-6)
@@ -61,12 +63,17 @@ def main():
         sources = apply_model(model, ((wav - mean) / deviation)[None],
                               device="cpu", shifts=0, split=True, overlap=0.25,
                               segment=5, progress=args.full)[0]
-        guitar = sources[model.sources.index("guitar")] * deviation + mean
-        mono = audio_functions.resample(guitar.mean(0), model.samplerate, 22050)
-    peak = mono.abs().max().item()
+        channels = []
+        for name in args.stems.split(','):
+            stem = sources[model.sources.index(name)] * deviation + mean
+            channels.append(audio_functions.resample(stem.mean(0), model.samplerate, 22050))
+        output = torch.stack(channels, dim=1)
+    peak = output.abs().max().item()
     if peak > 0.98:
-        mono = mono * (0.98 / peak)
-    sf.write(args.output, mono.numpy(), 22050, subtype="PCM_16")
+        output = output * (0.98 / peak)
+    # These channels are separate stems, not a stereo listening mix.
+    # The browser selects/mixes them and exports a normal mono WAV.
+    sf.write(args.output, output.numpy(), 22050, subtype="PCM_16")
     if cache_file is not None:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         temporary = cache_file.with_suffix('.tmp')
@@ -76,7 +83,7 @@ def main():
         for old in old_files[5:]:
             if old != cache_file:
                 old.unlink(missing_ok=True)
-    print("Guitar clip saved", flush=True)
+    print("Separated stems saved", flush=True)
 
 if __name__ == "__main__":
     main()

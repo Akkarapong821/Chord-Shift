@@ -59,6 +59,7 @@ test('GitHub Pages can connect to the home API, including private-network prefli
   assert.equal(health.headers.get('access-control-allow-origin'), origin);
   const audio = await fetch(`${base}/api/youtube?url=test`, { headers: { Origin: origin } });
   assert.match(audio.headers.get('access-control-expose-headers'), /X-Audio-Full-Song/);
+  assert.match(audio.headers.get('access-control-expose-headers'), /X-Audio-Stems/);
   assert.equal(await audio.text(), 'guitar');
   const preflight = await fetch(`${base}/api/youtube`, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Private-Network': 'true' } });
   assert.equal(preflight.status, 204);

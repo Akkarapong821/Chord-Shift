@@ -63,6 +63,22 @@ test('failed separation never silently substitutes the full mix', async (t) => {
   assert.equal(await response.text(), 'guitar-not-installed');
 });
 
+test('aligned guitar and drum stems are returned together and invalid selections never download', async (t) => {
+  const wave = Buffer.from('RIFF0000WAVEguitar-and-drums');
+  const response = await request(t, { separate: async (_audio, range) => {
+    assert.deepEqual(range, { start: 0, end: null, full: true, stems: ['guitar', 'drums'] });
+    return wave;
+  } }, videoUrl, '&isolate=guitar&full=1&stems=guitar,drums');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-audio-stems'), 'guitar,drums');
+  assert.equal(response.headers.get('x-audio-isolation'), 'guitar');
+  assert.equal(response.headers.get('x-audio-full-song'), '1');
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), wave);
+  const invalid = await request(t, { download: () => assert.fail('must not download') }, videoUrl, '&isolate=guitar&full=1&stems=vocals');
+  assert.equal(invalid.status, 422);
+  assert.equal(await invalid.text(), 'guitar-stems-invalid');
+});
+
 test('YouTube URLs select one video and reject lookalike domains', () => {
   assert.equal(extractVideoId(videoUrl), 'z164pDlYtOk');
   assert.equal(extractVideoId('https://youtu.be/z164pDlYtOk?t=30'), 'z164pDlYtOk');

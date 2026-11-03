@@ -3,7 +3,7 @@ import { BasicPitch } from '@spotify/basic-pitch';
 const MODEL_SAMPLE_RATE = 22050;
 
 // Decode any browser-supported audio file and resample to 22050 Hz mono.
-export async function decodeToModelRate(file) {
+export async function decodeToModelRate(file, { channels = 1 } = {}) {
   const arrayBuffer = await file.arrayBuffer();
   const ctx = new AudioContext();
   let decoded;
@@ -14,7 +14,8 @@ export async function decodeToModelRate(file) {
   }
 
   const length = Math.ceil(decoded.duration * MODEL_SAMPLE_RATE);
-  const offline = new OfflineAudioContext(1, length, MODEL_SAMPLE_RATE);
+  if (channels === 2 && decoded.numberOfChannels !== 2) throw new Error('ไฟล์แยกเสียงไม่มีแทร็กกีตาร์และกลองครบ — อัปเดตตัวช่วยแล้วดึงเพลงใหม่');
+  const offline = new OfflineAudioContext(channels, length, MODEL_SAMPLE_RATE);
   const source = offline.createBufferSource();
   source.buffer = decoded;
   source.connect(offline.destination);

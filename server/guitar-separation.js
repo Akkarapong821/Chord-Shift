@@ -11,14 +11,17 @@ let active = false;
 const fail = (code, status = 422) => Object.assign(new Error(code), { code, status });
 
 export function guitarRange(params) {
-  if (params.get('full') === '1') return { start: 0, end: null, full: true };
+  const stems = params.get('stems');
+  if (stems !== null && stems !== 'guitar,drums') throw fail('guitar-stems-invalid');
+  const options = stems ? { stems: ['guitar', 'drums'] } : {};
+  if (params.get('full') === '1') return { start: 0, end: null, full: true, ...options };
   const start = Number(params.get('start') || 0);
   const endText = params.get('end');
   const end = Number(endText);
   if (!endText || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 900 || end - start < 0.1 || end - start > 60) {
     throw fail('guitar-range-invalid');
   }
-  return { start, end };
+  return { start, end, ...options };
 }
 
 export async function separateGuitar(audio, range, signal) {
@@ -34,6 +37,7 @@ export async function separateGuitar(audio, range, signal) {
     if (signal.aborted) throw fail('guitar-cancelled');
     await new Promise((resolve, reject) => {
       const selectionArgs = range.full ? ['--full'] : ['--start', String(range.start), '--end', String(range.end)];
+      if (range.stems) selectionArgs.push('--stems', range.stems.join(','));
       const child = spawn(guitarPython, [join(root, 'scripts/separate-guitar.py'), '--input', input,
         '--output', output, ...selectionArgs], {
         windowsHide: true, shell: false, stdio: ['ignore', 'ignore', 'pipe'],

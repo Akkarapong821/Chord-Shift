@@ -7,6 +7,7 @@ import { playNotes, stop as stopPlayback } from './player.js';
 import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
 import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl, checkLocalServer } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
+import { StemPlayer } from './stem-player.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,8 @@ let sourceOffset = 0;
 let isolatedSource = false;
 let youtubeAbort = null;
 const originalAudio = $('original-audio');
+const stemPlayer = new StemPlayer(originalAudio, { onError: error => showError(error.message) });
+let stemPlayback = null;
 const timeStart = $('time-start');
 const timeEnd = $('time-end');
 let decodedAudio = null;
@@ -202,6 +205,7 @@ const YT_ERRORS = {
   'helper-busy': 'ตัวช่วยกำลังดึงเสียงให้แท็บอื่นอยู่ — รอให้เสร็จแล้วลองใหม่',
   'guitar-not-installed': 'เซิร์ฟเวอร์นี้ยังไม่ได้ติดตั้งตัวแยกเสียงกีตาร์ — ใช้เซิร์ฟเวอร์คอมบ้านที่เตรียมไว้ แล้วลองใหม่',
   'guitar-range-invalid': 'กรุณาเลือกเวลาเริ่ม–หยุดสำหรับแยกเสียงกีตาร์ ความยาว 0.1–60 วินาที และไม่เกินจบเพลง',
+  'guitar-stems-invalid': 'ตัวเลือกแยกเสียงไม่ถูกต้อง — รีเฟรชหน้าเว็บแล้วลองใหม่',
   'guitar-busy': 'คอมกำลังแยกเสียงกีตาร์ให้อีกแท็บอยู่ — รอให้เสร็จแล้วลองใหม่',
   'guitar-failed': 'แยกเสียงกีตาร์ไม่สำเร็จ — ลองเลือกช่วงสั้นลง หรือปิดการแยกเสียงแล้วแกะตามปกติ',
   'download-timeout': 'ดึงเสียงจาก YouTube นานเกินไป — ตรวจการเชื่อมต่อแล้วลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
@@ -225,7 +229,7 @@ async function handleYouTube() {
   resultSection.style.display = 'none';
   progressSection.style.display = 'block';
   ytBtn.disabled = true;
-  setProgress(0, isolateGuitar ? 'กำลังดึงและแยกกีตาร์ทั้งเพลงบนคอมบ้าน… เมื่อเสร็จจะแกะ TAB เฉพาะช่วงที่เลือก อาจรอหลายนาที' : 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
+  setProgress(0, isolateGuitar ? 'กำลังดึงและแยกกีตาร์กับกลองทั้งเพลงบนคอม… เมื่อเสร็จจะแกะ TAB จากกีตาร์เฉพาะช่วงที่เลือก อาจรอหลายนาที' : 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
   const aborter = new AbortController();
   youtubeAbort = aborter;
   $('cancel-youtube-btn').hidden = !isolateGuitar;
@@ -238,7 +242,7 @@ async function handleYouTube() {
       $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · กำลังดึงเสียงผ่านเครื่องนี้';
     }
     let requestUrl = youtubeRequestUrl(url, ytSource.value);
-    if (isolateGuitar) requestUrl += '&isolate=guitar&full=1';
+    if (isolateGuitar) requestUrl += '&isolate=guitar&full=1&stems=guitar,drums';
     const res = await fetch(requestUrl, { signal: aborter.signal });
     if (!res.ok) {
       const code = (await res.text()).trim();
@@ -270,15 +274,17 @@ async function handleYouTube() {
     if (!received || (total && received !== total)) throw new Error(YT_ERRORS['incomplete-audio']);
     const type = res.headers.get('Content-Type') || 'audio/webm';
     const separated = res.headers.get('X-Audio-Isolation') === 'guitar';
+    const pairedStems = res.headers.get('X-Audio-Stems') === 'guitar,drums';
     if (isolateGuitar && !separated) throw new Error('เซิร์ฟเวอร์ยังไม่รองรับการแยกกีตาร์ — ปิดแล้วเปิดเซิร์ฟเวอร์คอมบ้านใหม่');
+    if (isolateGuitar && !pairedStems) throw new Error('ตัวช่วยยังไม่รองรับการเลือกกีตาร์และกลอง — ปิดตัวช่วยเดิมแล้วเปิด start-youtube-helper.cmd เวอร์ชันล่าสุดใหม่');
     const offset = separated ? Number(res.headers.get('X-Audio-Start')) : 0;
     if (!Number.isFinite(offset) || offset < 0) throw new Error('เวลาอ้างอิงของเสียงกีตาร์ไม่ถูกต้อง');
     const ext = type.includes('wav') ? 'wav' : type.includes('mp4') ? 'm4a' : 'webm';
-    const file = new File([new Blob(chunks, { type })], `${title}${separated ? '-guitar' : ''}.${ext}`, { type });
+    const file = new File([new Blob(chunks, { type })], `${title}${pairedStems ? '-guitar-drums' : separated ? '-guitar' : ''}.${ext}`, { type });
     if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงผ่านตัวช่วยสำเร็จ';
     $('cancel-youtube-btn').hidden = true;
     progressSection.style.display = 'none';
-    await processFile(file, { offset, separated, fullSong: res.headers.get('X-Audio-Full-Song') === '1' });
+    await processFile(file, { offset, separated, pairedStems, fullSong: res.headers.get('X-Audio-Full-Song') === '1' });
   } catch (err) {
     console.error(err);
     progressSection.style.display = 'none';
@@ -318,6 +324,8 @@ function setBusy(on) {
   $('yt-preview-btn').disabled = on;
   $('check-helper-btn').disabled = on;
   $('guitar-isolation').disabled = on;
+  $('listen-guitar').disabled = on;
+  $('listen-drums').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
     $(id).disabled = on || !decodedAudio;
@@ -333,12 +341,16 @@ function setBusy(on) {
   }
 }
 
-async function processFile(file, { offset = 0, separated = false, fullSong = false } = {}) {
+async function processFile(file, { offset = 0, separated = false, fullSong = false, pairedStems = false } = {}) {
   currentFile = file;
   sourceOffset = offset;
   isolatedSource = separated;
   raw = null;
   decodedAudio = null;
+  stemPlayer.clear();
+  stemPlayback = null;
+  $('stem-controls').hidden = true;
+  originalAudio.hidden = false;
   analyzedRange = null;
   $('source-section').hidden = true;
   hideError();
@@ -347,16 +359,24 @@ async function processFile(file, { offset = 0, separated = false, fullSong = fal
   setProgress(0, 'กำลังอ่านไฟล์เสียง…');
 
   try {
-    decodedAudio = await decodeToModelRate(file);
+    decodedAudio = await decodeToModelRate(file, { channels: pairedStems ? 2 : 1 });
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    sourceUrl = URL.createObjectURL(file);
-    originalAudio.src = sourceUrl;
+    sourceUrl = pairedStems ? null : URL.createObjectURL(file);
+    if (!pairedStems) originalAudio.src = sourceUrl;
     $('audio-source-label').textContent = separated ? fullSong ? 'ฟังเฉพาะเสียงกีตาร์ทั้งเพลง' : 'ฟังเฉพาะเสียงกีตาร์ที่แยกได้' : 'ฟังเสียงต้นฉบับเทียบกับแท็บ';
     $('guitar-audio-download').textContent = fullSong ? 'ดาวน์โหลดเสียงกีตาร์ทั้งเพลง .wav' : 'ดาวน์โหลดเสียงกีตาร์ .wav';
     $('guitar-audio-download').hidden = !separated;
     $('guitar-audio-download').href = sourceUrl;
     $('guitar-audio-download').download = file.name;
     $('source-name').textContent = file.name;
+    if (pairedStems) {
+      stemPlayer.load(decodedAudio);
+      stemPlayback = { fullSong, name: file.name.replace(/-guitar-drums\.wav$/i, '') };
+      $('listen-guitar').checked = true;
+      $('listen-drums').checked = false;
+      $('stem-controls').hidden = false;
+      updateStemPlayback();
+    }
     $('source-section').hidden = false;
     updateRangeStatus();
     await analyzeSelection();
@@ -370,6 +390,34 @@ async function processFile(file, { offset = 0, separated = false, fullSong = fal
     );
   }
 }
+
+function updateStemPlayback() {
+  if (!stemPlayback) return;
+  const guitar = $('listen-guitar').checked;
+  const drums = $('listen-drums').checked;
+  const selected = stemPlayer.select({ guitar, drums });
+  const name = guitar && drums ? 'กีตาร์และกลอง' : guitar ? 'กีตาร์' : 'กลอง';
+  const suffix = guitar && drums ? 'guitar-drums' : guitar ? 'guitar' : 'drums';
+  const length = stemPlayback.fullSong ? 'ทั้งเพลง' : 'ที่แยกได้';
+  originalAudio.hidden = !selected;
+  $('guitar-audio-download').hidden = !selected;
+  $('audio-source-label').textContent = selected ? `ฟังเฉพาะเสียง${name}${length}` : 'เลือกเสียงที่ต้องการฟัง';
+  $('stem-playback-status').textContent = selected
+    ? 'เลือกฟังทีละเสียงหรือทั้งสองพร้อมกันได้ · TAB แกะจากเสียงกีตาร์'
+    : 'เลือกกีตาร์หรือกลองอย่างน้อยหนึ่งเสียงเพื่อฟังและดาวน์โหลด';
+  if (selected) {
+    const filename = `${stemPlayback.name}-${suffix}.wav`;
+    $('guitar-audio-download').href = selected.url;
+    $('guitar-audio-download').download = filename;
+    $('guitar-audio-download').textContent = `ดาวน์โหลดเสียง${name}${length} .wav`;
+    $('source-name').textContent = filename;
+  } else $('source-name').textContent = stemPlayback.name;
+}
+for (const id of ['listen-guitar', 'listen-drums']) $(id).addEventListener('change', updateStemPlayback);
+window.addEventListener('pagehide', event => {
+  if (event.persisted) originalAudio.pause();
+  else stemPlayer.clear();
+});
 
 async function analyzeSelection() {
   const requested = requestedRange();
@@ -438,6 +486,9 @@ $('analyze-range-btn').addEventListener('click', async () => {
 
 $('preview-range-btn').addEventListener('click', async () => {
   if (busy || !decodedAudio) return;
+  if (stemPlayback && !$('listen-guitar').checked && !$('listen-drums').checked) {
+    showError('เลือกกีตาร์หรือกลองอย่างน้อยหนึ่งเสียงก่อนฟัง'); return;
+  }
   if (previewEnd !== null) { originalAudio.pause(); return; }
   hideError();
   try {

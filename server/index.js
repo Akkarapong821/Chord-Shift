@@ -43,7 +43,7 @@ export function createAppServer({ distDir = defaultDistDir, youtubeHandler = cre
       if (origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Vary', 'Origin');
-        res.setHeader('Access-Control-Expose-Headers', 'X-Video-Title, X-Audio-Start, X-Audio-Isolation, X-Audio-Full-Song, Content-Length');
+        res.setHeader('Access-Control-Expose-Headers', 'X-Video-Title, X-Audio-Start, X-Audio-Isolation, X-Audio-Full-Song, X-Audio-Stems, Content-Length');
       }
       if (req.method === 'OPTIONS') {
         if (!origin || req.headers['access-control-request-method'] !== 'GET') { sendText(res, 403, 'forbidden-preflight'); return; }

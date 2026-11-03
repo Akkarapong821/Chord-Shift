@@ -154,7 +154,7 @@
       <p class="note" id="time-help">ใส่เวลาแบบ 1:25 หรือ 85 วินาที · เว้นเวลาสิ้นสุดว่างเพื่อแกะจนจบเพลง<br>เลือกช่วงก่อนอัปโหลดหรือดึงจาก YouTube ได้ หลังโหลดเพลงแล้วเปลี่ยนช่วงและแกะใหม่ได้ทันที</p>
       <p id="yt-range-summary" class="note" aria-live="polite">เริ่ม 0:00 → จบเพลง</p>
       <label class="toggle"><input type="checkbox" id="guitar-isolation" />แยกเสียงกีตาร์ก่อนแกะ TAB</label>
-      <p class="note">แยกกีตาร์ทั้งเพลงเพื่อฟังและดาวน์โหลด แล้วแกะ TAB เฉพาะเวลาเริ่ม–หยุดที่เลือก · ใช้คอมบ้านประมวลผล อาจรอหลายนาทีและยังมีเสียงอื่นปนได้</p>
+      <p class="note">แยกกีตาร์และกลองทั้งเพลงเพื่อเลือกฟังหรือดาวน์โหลดทีละเสียงหรือทั้งสองพร้อมกัน แล้วแกะ TAB จากกีตาร์เฉพาะเวลาเริ่ม–หยุดที่เลือก · ใช้คอมประมวลผล อาจรอหลายนาทีและยังมีเสียงอื่นปนได้</p>
       <div class="toolbar time-actions">
         <button id="yt-preview-btn">▶ ฟังช่วงนี้บน YouTube</button>
         <button id="yt-preview-stop-btn" disabled hidden>■ หยุดฟัง</button>
@@ -255,6 +255,14 @@
 
       <div class="panel" id="source-section" hidden>
         <label for="original-audio" id="audio-source-label">ฟังเสียงต้นฉบับเทียบกับแท็บ</label>
+        <fieldset id="stem-controls" hidden style="border:0; padding:0; margin:12px 0 4px;">
+          <legend style="font-size:13px; margin-bottom:8px;">เลือกเสียงที่ต้องการฟัง</legend>
+          <div class="controls">
+            <label class="toggle"><input type="checkbox" id="listen-guitar" checked />กีตาร์</label>
+            <label class="toggle"><input type="checkbox" id="listen-drums" />กลอง</label>
+          </div>
+          <p class="note" id="stem-playback-status" role="status">เลือกฟังทีละเสียงหรือทั้งสองพร้อมกันได้ · TAB แกะจากเสียงกีตาร์</p>
+        </fieldset>
         <audio id="original-audio" controls preload="metadata"></audio>
         <a id="guitar-audio-download" hidden style="color:var(--accent)">ดาวน์โหลดเสียงกีตาร์ .wav</a>
         <p class="note" id="source-name"></p>

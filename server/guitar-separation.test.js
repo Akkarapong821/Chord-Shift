@@ -9,3 +9,12 @@ test('separation accepts finite clip boundaries up to 60 seconds within 15 minut
     assert.throws(() => guitarRange(new URLSearchParams(query)), { code: 'guitar-range-invalid' });
   }
 });
+
+test('guitar and drums transport is explicit and invalid stem choices are rejected', () => {
+  assert.deepEqual(guitarRange(new URLSearchParams('full=1&stems=guitar,drums')), {
+    start: 0, end: null, full: true, stems: ['guitar', 'drums'],
+  });
+  for (const stems of ['drums', 'vocals', 'guitar,drums,vocals', '']) {
+    assert.throws(() => guitarRange(new URLSearchParams({ full: '1', stems })), { code: 'guitar-stems-invalid' });
+  }
+});
