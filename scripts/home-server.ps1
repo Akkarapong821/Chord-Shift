@@ -3,7 +3,8 @@ $ErrorActionPreference = 'Stop'
 $projectDir = Split-Path -Parent $PSScriptRoot
 $nodePath = (Get-Command node -ErrorAction Stop).Source
 $script:webProcess = $null
-$script:websiteUrl = 'http://127.0.0.1:39842/index.html?page=melody'
+$script:websiteUrl = 'https://akkarapong821.github.io/Chord-Shift/index.html?page=melody'
+$script:localServerUrl = 'http://127.0.0.1:39842'
 $logDir = Join-Path $projectDir '.tools'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $script:windowMutex = $null
@@ -19,7 +20,7 @@ if (-not $SmokeTest) {
     if (-not $ownsWindow) {
         if ($StartAndOpen) {
             # Ask the existing controller to start (if stopped) and open its
-            # fixed local website. Repeated launches never spawn extra servers.
+            # fixed GitHub website. Repeated launches never spawn extra servers.
             $existingEvent = [System.Threading.EventWaitHandle]::OpenExisting('Local\MelodyTabHomeOpen-' + $rootHash)
             try { [void]$existingEvent.Set() } finally { $existingEvent.Dispose() }
         }
@@ -104,10 +105,10 @@ if ($SmokeTest) {
     try {
         Start-HomeServer
         $page = Invoke-WebRequest -UseBasicParsing -Uri $script:websiteUrl -TimeoutSec 15
-        if ($page.StatusCode -ne 200 -or -not $page.Content.Contains('id="yt-btn"')) { throw 'Home website check failed.' }
+        if ($page.StatusCode -ne 200 -or -not $page.Content.Contains('id="yt-btn"')) { throw 'GitHub website check failed.' }
         Write-Output "PASS: $script:websiteUrl"
         if ($TestYouTube) {
-            $origin = ([Uri]$script:websiteUrl).GetLeftPart([System.UriPartial]::Authority)
+            $origin = $script:localServerUrl
             $audioFile = Join-Path $logDir 'home-youtube-test.m4a'
             $audioResponse = Invoke-WebRequest -UseBasicParsing -Uri ($origin + '/api/youtube?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dz164pDlYtOk') -OutFile $audioFile -PassThru -TimeoutSec 75
             $receivedBytes = (Get-Item -LiteralPath $audioFile).Length
@@ -156,7 +157,7 @@ $openButton.Size = New-Object System.Drawing.Size(145, 40)
 $openButton.Enabled = $false
 $form.Controls.Add($openButton)
 $helpLabel = New-Object System.Windows.Forms.Label
-$helpLabel.Text = 'Melody Tab runs on this computer only. Phones use Chord Shift on the public website. Stop server or close this window when finished.'
+$helpLabel.Text = 'Open website uses GitHub Pages. Keep this helper running on this computer for YouTube and guitar separation. Stop server or close this window when finished.'
 $helpLabel.Location = New-Object System.Drawing.Point(20, 195)
 $helpLabel.Size = New-Object System.Drawing.Size(580, 55)
 $form.Controls.Add($helpLabel)

@@ -30,7 +30,7 @@ export function defaultYouTubeSource(hostname) {
 export async function checkLocalServer(fetchRequest = fetch) {
   let response;
   try { response = await fetchRequest(`${LOCAL_SERVER_URL}/api/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
-  catch { throw new Error('เปิด start-youtube-helper.cmd บนคอมเครื่องนี้ แล้วใช้หน้า Melody Tab ที่เปิดขึ้นมาได้เลย'); }
+  catch { throw new Error('เปิด start-youtube-helper.cmd บนคอมเครื่องนี้ค้างไว้ และอนุญาตให้หน้า GitHub เข้าถึงเครือข่ายในเครื่อง (Local network) หากเบราว์เซอร์ถาม แล้วลองแกะอีกครั้ง'); }
   const health = response.ok ? await response.json().catch(() => null) : null;
   if (health?.service !== 'melody-tab' || health?.version !== 1) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อมเชื่อมต่อเว็บนี้ — ปิดแล้วเปิด Home Server เวอร์ชันล่าสุดใหม่');
   return LOCAL_SERVER_URL;
