@@ -1,6 +1,8 @@
 """Local six-stem separation; only the requested guitar clip is saved."""
 import argparse
 import os
+import hashlib
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -15,6 +17,14 @@ def main():
     parser.add_argument("--start", type=float, default=0)
     parser.add_argument("--end", type=float)
     args = parser.parse_args()
+    cache_file = None
+    if args.full and args.input and args.output:
+        digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
+        cache_file = ROOT / '.tools' / 'guitar-cache' / f'guitar-{digest}-v1.wav'
+        if cache_file.is_file():
+            shutil.copyfile(cache_file, args.output)
+            print('Cached full-song guitar saved', flush=True)
+            return
     import torch
     from demucs.pretrained import get_model
     torch.set_num_threads(min(4, os.cpu_count() or 2))
@@ -57,6 +67,15 @@ def main():
     if peak > 0.98:
         mono = mono * (0.98 / peak)
     sf.write(args.output, mono.numpy(), 22050, subtype="PCM_16")
+    if cache_file is not None:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        temporary = cache_file.with_suffix('.tmp')
+        shutil.copyfile(args.output, temporary)
+        temporary.replace(cache_file)
+        old_files = sorted(cache_file.parent.glob('guitar-*-v1.wav'), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in old_files[5:]:
+            if old != cache_file:
+                old.unlink(missing_ok=True)
     print("Guitar clip saved", flush=True)
 
 if __name__ == "__main__":

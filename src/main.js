@@ -138,9 +138,17 @@ if (homeParam) {
   const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('home');
   history.replaceState(null, '', cleanUrl);
 }
+function updateDirectHomeLink() {
+  try {
+    $('home-direct-link').href = normalizeHomeServer(homeServerInput.value.trim()) + '/index.html?page=melody';
+    $('home-direct-link').hidden = false;
+  } catch { $('home-direct-link').hidden = true; }
+}
+updateDirectHomeLink();
 async function connectHome() {
   $('connect-home-btn').disabled = true;
   $('home-status').textContent = 'กำลังเชื่อมต่อคอมบ้าน…';
+  updateDirectHomeLink();
   try {
     connectedHome = await checkHomeServer(homeServerInput.value.trim());
     try { localStorage.setItem('melody-home-server', connectedHome); } catch { }
@@ -150,7 +158,7 @@ async function connectHome() {
     connectedHome = ''; $('home-status').textContent = error.message; throw error;
   } finally { $('connect-home-btn').disabled = busy; }
 }
-homeServerInput.addEventListener('input', () => { connectedHome = ''; $('home-status').textContent = 'กดเชื่อมต่อคอมบ้านเพื่อใช้ลิงก์นี้'; });
+homeServerInput.addEventListener('input', () => { connectedHome = ''; updateDirectHomeLink(); $('home-status').textContent = 'กดเชื่อมต่อคอมบ้านเพื่อใช้ลิงก์นี้'; });
 $('connect-home-btn').addEventListener('click', () => connectHome().catch(() => {}));
 $('cancel-youtube-btn').addEventListener('click', () => youtubeAbort?.abort());
 function stopYouTubePreview() {
