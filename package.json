@@ -12,6 +12,7 @@
     "helper": "node server/helper.js",
     "home": "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/home-server.ps1",
     "setup:youtube": "node scripts/setup-youtube.mjs",
+    "setup:guitar": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup-guitar.ps1",
     "test": "node --test \"src/*.test.js\" \"src/chords/*.test.js\" \"server/*.test.js\""
   },
   "dependencies": {

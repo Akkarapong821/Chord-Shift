@@ -13,7 +13,9 @@ function Stop-HomeServer {
     # These handles belong only to processes created by this window.
     foreach ($ownedProcess in @($script:serveProcess, $script:webProcess)) {
         if ($null -ne $ownedProcess -and -not $ownedProcess.HasExited) {
-            Stop-Process -Id $ownedProcess.Id -ErrorAction SilentlyContinue
+            # Stop this window's process tree, including an active separator
+            # or downloader, without targeting unrelated Python/Node services.
+            Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/taskkill.exe') -ArgumentList @('/PID', [string]$ownedProcess.Id, '/T', '/F') -WindowStyle Hidden -Wait | Out-Null
             $ownedProcess.WaitForExit(5000) | Out-Null
         }
     }

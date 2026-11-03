@@ -1,5 +1,6 @@
 import { Innertube } from 'youtubei.js';
 import { downloadAudio, MAX_AUDIO_BYTES } from './youtube-download.js';
+import { guitarRange, separateGuitar } from './guitar-separation.js';
 
 const MAX_VIDEO_SECONDS = 15 * 60;
 const YT_CLIENT = 'IOS';
@@ -38,7 +39,7 @@ async function abortable(promise, signal) {
   finally { signal.removeEventListener('abort', onAbort); }
 }
 
-export function createYouTubeHandler({ getInnertube, download = downloadAudio, timeoutMs = 60000 } = {}) {
+export function createYouTubeHandler({ getInnertube, download = downloadAudio, separate = separateGuitar, timeoutMs = 60000 } = {}) {
   let session;
   getInnertube ??= () => (session ??= Innertube.create().catch((error) => {
     session = null;
@@ -46,17 +47,22 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, t
   }));
 
   return async (req, res) => {
-    const videoId = extractVideoId(new URL(req.url, 'http://localhost').searchParams.get('url'));
+    const params = new URL(req.url, 'http://localhost').searchParams;
+    const videoId = extractVideoId(params.get('url'));
     if (!videoId) {
       res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('invalid-url');
       return;
     }
+    const guitar = params.get('isolate') === 'guitar';
+    let range;
+    try { if (guitar) range = guitarRange(params); }
+    catch (error) { res.writeHead(error.status, { 'Content-Type': 'text/plain' }); res.end(error.code); return; }
 
     const controller = new AbortController();
     const cancel = () => controller.abort();
     res.on('close', cancel);
-    const timeout = setTimeout(cancel, timeoutMs);
+    let timeout = setTimeout(cancel, timeoutMs);
     try {
       let info = null;
       try {
@@ -84,9 +90,17 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, t
       }
       if (controller.signal.aborted) throw fail('download-timeout', 504);
       if (!audio.length) throw fail('incomplete-audio');
+      if (guitar) {
+        if (info?.basic_info?.duration && range.end > Number(info.basic_info.duration)) throw fail('guitar-range-invalid', 422);
+        clearTimeout(timeout);
+        timeout = setTimeout(cancel, 15 * 60 * 1000);
+        audio = await abortable(separate(audio, range, controller.signal), controller.signal);
+        res.setHeader('X-Audio-Start', String(range.start));
+        res.setHeader('X-Audio-Isolation', 'guitar');
+      }
       if (audio.length > MAX_AUDIO_BYTES) throw fail('audio-too-large', 413);
       res.writeHead(200, {
-        'Content-Type': 'audio/mp4',
+        'Content-Type': guitar ? 'audio/wav' : 'audio/mp4',
         'Content-Length': audio.length,
         'Cache-Control': 'no-store',
         'X-Video-Title': encodeURIComponent(info?.basic_info?.title || videoId),

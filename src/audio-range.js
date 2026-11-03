@@ -31,6 +31,14 @@ export function formatAudioTime(seconds) {
   return `${minutes}:${Number(remainder) < 10 ? '0' : ''}${remainder}`;
 }
 
+export function rangeForSource(startText, endText, duration, offset = 0) {
+  const range = readAudioRange(startText, endText, offset + duration + 0.001);
+  if (range.start < offset) throw new Error(`เสียงกีตาร์ที่โหลดไว้เริ่มที่ ${formatAudioTime(offset)} — เลือกช่วงภายในเสียงนี้ หรือดึงจากลิงก์ใหม่`);
+  if (range.start >= offset + duration) throw new Error('เวลาเริ่มต้นต้องอยู่ก่อนจบเสียงที่โหลดไว้');
+  range.end = Math.min(range.end, offset + duration);
+  return range;
+}
+
 export function cropAudioSamples(audio, range) {
   const source = audio.getChannelData(0);
   const start = Math.round(range.start * audio.sampleRate);

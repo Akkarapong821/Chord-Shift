@@ -4,7 +4,7 @@ import { extractMelody, extractElectricGuitarMelody } from './melody.js';
 import { assignFrets } from './fretting.js';
 import { renderTab } from './tab.js';
 import { playNotes, stop as stopPlayback } from './player.js';
-import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime } from './audio-range.js';
+import { readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
 import { checkYouTubeHelper, defaultYouTubeSource, youtubeRequestUrl, youtubePreviewUrl } from './youtube-source.js';
 import { canRecordTab, startTabRecording } from './tab-recording.js';
 
@@ -30,6 +30,9 @@ let currentTabText = '';
 let playing = false;
 let busy = false;
 let sourceUrl = null;
+let sourceOffset = 0;
+let isolatedSource = false;
+let youtubeAbort = null;
 const originalAudio = $('original-audio');
 const timeStart = $('time-start');
 const timeEnd = $('time-end');
@@ -90,7 +93,8 @@ $('cancel-record-btn').addEventListener('click', () => recording?.cancel());
 window.addEventListener('pagehide', () => recording?.cancel());
 
 function requestedRange() {
-  return readAudioRange(timeStart.value, timeEnd.value, decodedAudio?.duration ?? Infinity);
+  return decodedAudio ? rangeForSource(timeStart.value, timeEnd.value, decodedAudio.duration, sourceOffset)
+    : readAudioRange(timeStart.value, timeEnd.value);
 }
 
 function validateTimeInputs() {
@@ -124,6 +128,7 @@ fileInput.addEventListener('change', () => {
 const ytUrl = $('yt-url');
 const ytBtn = $('yt-btn');
 const ytSource = $('yt-source');
+$('cancel-youtube-btn').addEventListener('click', () => youtubeAbort?.abort());
 function stopYouTubePreview() {
   $('yt-preview').removeAttribute('src');
   $('yt-preview-section').hidden = true;
@@ -188,6 +193,10 @@ const YT_ERRORS = {
   'video-unavailable': 'วิดีโอนี้ไม่พร้อมให้ดึงเสียง อาจเป็นวิดีโอส่วนตัวหรือต้องเข้าสู่ระบบ — ใช้ไฟล์เสียงจากเครื่องแทน',
   'youtube-bot-check': 'YouTube ขอการยืนยันว่าไม่ใช่บอตจากเซิร์ฟเวอร์เว็บ — เปลี่ยนเป็นตัวช่วยบนเครื่องนี้ หรืออัปโหลดไฟล์เสียงแทน',
   'helper-busy': 'ตัวช่วยกำลังดึงเสียงให้แท็บอื่นอยู่ — รอให้เสร็จแล้วลองใหม่',
+  'guitar-not-installed': 'เซิร์ฟเวอร์นี้ยังไม่ได้ติดตั้งตัวแยกเสียงกีตาร์ — ใช้เซิร์ฟเวอร์คอมบ้านที่เตรียมไว้ แล้วลองใหม่',
+  'guitar-range-invalid': 'กรุณาเลือกเวลาเริ่ม–หยุดสำหรับแยกเสียงกีตาร์ ความยาว 0.1–60 วินาที และไม่เกินจบเพลง',
+  'guitar-busy': 'คอมกำลังแยกเสียงกีตาร์ให้อีกแท็บอยู่ — รอให้เสร็จแล้วลองใหม่',
+  'guitar-failed': 'แยกเสียงกีตาร์ไม่สำเร็จ — ลองเลือกช่วงสั้นลง หรือปิดการแยกเสียงแล้วแกะตามปกติ',
   'download-timeout': 'ดึงเสียงจาก YouTube นานเกินไป — ตรวจการเชื่อมต่อแล้วลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
   'incomplete-audio': 'ได้รับเสียงจาก YouTube ไม่ครบ — กรุณาลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
   'invalid-audio': 'YouTube ไม่ได้ส่งไฟล์เสียงที่รองรับกลับมา — ลองใหม่ หรืออัปโหลดไฟล์เสียงแทน',
@@ -200,21 +209,33 @@ async function handleYouTube() {
   const url = ytUrl.value.trim();
   if (!url || busy) return;
   if (!validateTimeInputs()) return;
+  const isolateGuitar = $('guitar-isolation').checked;
+  const guitarRange = readAudioRange(timeStart.value, timeEnd.value);
+  if (isolateGuitar && (!Number.isFinite(guitarRange.end) || guitarRange.end - guitarRange.start > 60)) {
+    showError(YT_ERRORS['guitar-range-invalid']); return;
+  }
   decodedAudio = null;
+  sourceOffset = 0;
   $('source-section').hidden = true;
   setBusy(true);
   hideError();
   resultSection.style.display = 'none';
   progressSection.style.display = 'block';
   ytBtn.disabled = true;
-  setProgress(0, 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
+  setProgress(0, isolateGuitar ? 'กำลังดึงเพลงและแยกเสียงกีตาร์บนคอมบ้าน… อาจใช้เวลาหลายนาที' : 'กำลังดึงเสียงจาก YouTube… (อาจใช้เวลาสักครู่)');
+  const aborter = new AbortController();
+  youtubeAbort = aborter;
+  $('cancel-youtube-btn').hidden = !isolateGuitar;
+  const requestTimer = setTimeout(() => aborter.abort(new DOMException('Timed out', 'TimeoutError')), isolateGuitar ? 16 * 60 * 1000 : 75000);
 
   try {
     if (ytSource.value === 'helper') {
       await checkYouTubeHelper();
       $('helper-status').textContent = 'ตัวช่วยพร้อมใช้งาน · กำลังดึงเสียงผ่านเครื่องนี้';
     }
-    const res = await fetch(youtubeRequestUrl(url, ytSource.value), { signal: AbortSignal.timeout(75000) });
+    let requestUrl = youtubeRequestUrl(url, ytSource.value);
+    if (isolateGuitar) requestUrl += `&isolate=guitar&start=${guitarRange.start}&end=${guitarRange.end}`;
+    const res = await fetch(requestUrl, { signal: aborter.signal });
     if (!res.ok) {
       const code = (await res.text()).trim();
       if (code === 'youtube-bot-check' && ytSource.value === 'helper') {
@@ -244,16 +265,22 @@ async function handleYouTube() {
 
     if (!received || (total && received !== total)) throw new Error(YT_ERRORS['incomplete-audio']);
     const type = res.headers.get('Content-Type') || 'audio/webm';
-    const ext = type.includes('mp4') ? 'm4a' : 'webm';
-    const file = new File([new Blob(chunks, { type })], `${title}.${ext}`, { type });
+    const separated = res.headers.get('X-Audio-Isolation') === 'guitar';
+    if (isolateGuitar && !separated) throw new Error('เซิร์ฟเวอร์ยังไม่รองรับการแยกกีตาร์ — ปิดแล้วเปิดเซิร์ฟเวอร์คอมบ้านใหม่');
+    const offset = separated ? Number(res.headers.get('X-Audio-Start')) : 0;
+    if (!Number.isFinite(offset) || offset < 0) throw new Error('เวลาอ้างอิงของเสียงกีตาร์ไม่ถูกต้อง');
+    const ext = type.includes('wav') ? 'wav' : type.includes('mp4') ? 'm4a' : 'webm';
+    const file = new File([new Blob(chunks, { type })], `${title}${separated ? '-guitar' : ''}.${ext}`, { type });
     if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงผ่านตัวช่วยสำเร็จ';
+    $('cancel-youtube-btn').hidden = true;
     progressSection.style.display = 'none';
-    await processFile(file);
+    await processFile(file, { offset, separated });
   } catch (err) {
     console.error(err);
     progressSection.style.display = 'none';
     if (ytSource.value === 'helper') $('helper-status').textContent = 'ดึงเสียงยังไม่สำเร็จ · ดูข้อความด้านล่าง';
-    showError(err.name === 'TimeoutError' || err.name === 'AbortError'
+    showError(err.name === 'AbortError' ? 'ยกเลิกการดึงและแยกเสียงแล้ว'
+      : err.name === 'TimeoutError'
       ? YT_ERRORS['download-timeout']
       : err instanceof TypeError && ytSource.value === 'helper'
       ? 'การเชื่อมต่อตัวช่วยขาดหาย — เปิดตัวช่วยค้างไว้และอนุญาตการเข้าถึงเครือข่ายในเครื่อง แล้วลองใหม่'
@@ -261,6 +288,9 @@ async function handleYouTube() {
       ? 'การเชื่อมต่อกับเซิร์ฟเวอร์ขาดหายระหว่างดึงเสียง — ตรวจว่าเซิร์ฟเวอร์ยังทำงาน แล้วลองใหม่ หรืออัปโหลดไฟล์เสียงแทน'
       : err.message);
   } finally {
+    clearTimeout(requestTimer);
+    youtubeAbort = null;
+    $('cancel-youtube-btn').hidden = true;
     setBusy(false);
   }
 }
@@ -283,6 +313,7 @@ function setBusy(on) {
   ytSource.disabled = on;
   $('yt-preview-btn').disabled = on;
   $('check-helper-btn').disabled = on;
+  $('guitar-isolation').disabled = on;
   for (const id of ['time-start', 'time-end', 'full-range-btn']) $(id).disabled = on;
   for (const id of ['analyze-range-btn', 'preview-range-btn', 'use-start-btn', 'use-end-btn']) {
     $(id).disabled = on || !decodedAudio;
@@ -298,8 +329,10 @@ function setBusy(on) {
   }
 }
 
-async function processFile(file) {
+async function processFile(file, { offset = 0, separated = false } = {}) {
   currentFile = file;
+  sourceOffset = offset;
+  isolatedSource = separated;
   raw = null;
   decodedAudio = null;
   analyzedRange = null;
@@ -314,6 +347,10 @@ async function processFile(file) {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(file);
     originalAudio.src = sourceUrl;
+    $('audio-source-label').textContent = separated ? 'ฟังเฉพาะเสียงกีตาร์ที่แยกได้' : 'ฟังเสียงต้นฉบับเทียบกับแท็บ';
+    $('guitar-audio-download').hidden = !separated;
+    $('guitar-audio-download').href = sourceUrl;
+    $('guitar-audio-download').download = file.name;
     $('source-name').textContent = file.name;
     $('source-section').hidden = false;
     updateRangeStatus();
@@ -330,9 +367,10 @@ async function processFile(file) {
 }
 
 async function analyzeSelection() {
-  const selection = cropAudioSamples(decodedAudio, requestedRange());
-  analyzedRange = { start: selection.start, end: selection.end };
-  const label = `${formatAudioTime(selection.start)} – ${formatAudioTime(selection.end)}`;
+  const requested = requestedRange();
+  const selection = cropAudioSamples(decodedAudio, { start: requested.start - sourceOffset, end: requested.end - sourceOffset });
+  analyzedRange = { start: selection.start + sourceOffset, end: selection.end + sourceOffset };
+  const label = `${formatAudioTime(analyzedRange.start)} – ${formatAudioTime(analyzedRange.end)}`;
   progressSection.style.display = 'block';
   setProgress(0.05, `กำลังแกะช่วง ${label}…`);
   raw = await transcribe(selection.samples, (pct) => {
@@ -347,7 +385,7 @@ async function analyzeSelection() {
 
 function updateRangeStatus() {
   updateYouTubeRangeSummary();
-  const loaded = decodedAudio ? `ความยาวเพลง ${formatAudioTime(decodedAudio.duration)}` : 'ยังไม่ได้โหลดเพลง';
+  const loaded = decodedAudio ? isolatedSource ? `เสียงกีตาร์ ${formatAudioTime(sourceOffset)} – ${formatAudioTime(sourceOffset + decodedAudio.duration)}` : `ความยาวเพลง ${formatAudioTime(decodedAudio.duration)}` : 'ยังไม่ได้โหลดเพลง';
   try {
     const range = requestedRange();
     const end = Number.isFinite(range.end) ? formatAudioTime(range.end) : 'จบเพลง';
@@ -372,13 +410,13 @@ function rangeChanged() {
 timeStart.addEventListener('input', rangeChanged);
 timeEnd.addEventListener('input', rangeChanged);
 $('full-range-btn').addEventListener('click', () => {
-  timeStart.value = '0:00';
+  timeStart.value = formatAudioTime(sourceOffset);
   timeEnd.value = '';
   rangeChanged();
 });
 for (const [id, field] of [['use-start-btn', timeStart], ['use-end-btn', timeEnd]]) {
   $(id).addEventListener('click', () => {
-    field.value = formatAudioTime(Math.min(originalAudio.currentTime, decodedAudio.duration));
+    field.value = formatAudioTime(sourceOffset + Math.min(originalAudio.currentTime, decodedAudio.duration));
     rangeChanged();
   });
 }
@@ -399,8 +437,8 @@ $('preview-range-btn').addEventListener('click', async () => {
   hideError();
   try {
     const range = requestedRange();
-    originalAudio.currentTime = range.start;
-    previewEnd = range.end;
+    originalAudio.currentTime = range.start - sourceOffset;
+    previewEnd = range.end - sourceOffset;
     await originalAudio.play();
     $('preview-range-btn').textContent = '■ หยุดฟังช่วงที่เลือก';
   } catch (error) { stopPreview(); showError(error.message); }
@@ -455,7 +493,9 @@ function rebuild() {
   const fretLimit = Number(maxFret.value);
   pitchRange.disabled = !electric;
   $('mode-help').textContent = electric
-    ? 'โหมดกีตาร์ไฟฟ้าเลือกแนวโน้ตที่ต่อเนื่องในช่วงเสียงที่กำหนด และคงระดับเสียงเดิม เครื่องมือนี้ยังไม่แยกกีตาร์ออกจากเสียงร้องหรือเครื่องดนตรีอื่นในเพลงเต็ม'
+    ? isolatedSource
+      ? 'กำลังแกะจากเสียงกีตาร์ที่แยกแล้ว โดยคงระดับเสียงเดิมและเลือกแนวโน้ตที่ต่อเนื่อง อาจมีเสียงเครื่องดนตรีอื่นหลงเหลือ'
+      : 'โหมดกีตาร์ไฟฟ้าเลือกแนวโน้ตที่ต่อเนื่องและคงระดับเสียงเดิม หากต้องการลดเสียงร้อง เบส และกลอง ให้เปิดแยกเสียงกีตาร์ก่อนแกะ TAB'
     : 'โหมดเมโลดี้ทั่วไปเลือกโน้ตเด่นในแต่ละช่วง โน้ตนอกช่วงกีตาร์จะถูกเลื่อน octave ให้เล่นได้';
 
   const sens = Number(sensitivity.value); // 1..9, higher = more notes
@@ -492,7 +532,7 @@ function rebuild() {
   }
 
   currentNotes = assignFrets(notes, { maxFret: fretLimit, octaveShift: !electric });
-  const tabHeader = `${electric ? 'Electric Guitar' : 'Melody'} TAB · Standard tuning: E A D G B e · Frets: 0–${fretLimit}`;
+  const tabHeader = `${electric ? 'Electric Guitar' : 'Melody'} TAB${isolatedSource ? ' · Isolated guitar (Demucs 6 stems)' : ''} · Standard tuning: E A D G B e · Frets: 0–${fretLimit}`;
   const rangeLabel = `${formatAudioTime(analyzedRange.start)} – ${formatAudioTime(analyzedRange.end)}`;
   currentTabText = `${tabHeader}\nSource time: ${rangeLabel}\n${electric ? 'Original pitches' : 'Octave adjusted to playable range'} · Sequential notes, not rhythmic notation\n\n${renderTab(currentNotes)}`;
 

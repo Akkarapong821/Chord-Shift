@@ -157,10 +157,13 @@
       </div>
       <p class="note" id="time-help">ใส่เวลาแบบ 1:25 หรือ 85 วินาที · เว้นเวลาสิ้นสุดว่างเพื่อแกะจนจบเพลง<br>เลือกช่วงก่อนอัปโหลดหรือดึงจาก YouTube ได้ หลังโหลดเพลงแล้วเปลี่ยนช่วงและแกะใหม่ได้ทันที</p>
       <p id="yt-range-summary" class="note" aria-live="polite">เริ่ม 0:00 → จบเพลง</p>
+      <label class="toggle"><input type="checkbox" id="guitar-isolation" />แยกเสียงกีตาร์ก่อนแกะ TAB</label>
+      <p class="note">ใช้คอมบ้านแยกกีตาร์จากร้อง เบส และกลอง · ต้องระบุเวลาเริ่ม–หยุดครั้งละไม่เกิน 60 วินาที · อาจใช้เวลาหลายนาทีและยังมีเสียงอื่นปนได้</p>
       <div class="toolbar time-actions">
         <button id="yt-preview-btn">▶ ฟังช่วงนี้บน YouTube</button>
         <button id="yt-preview-stop-btn" disabled hidden>■ หยุดฟัง</button>
         <button class="primary" id="yt-btn">แกะ TAB เฉพาะช่วงนี้</button>
+        <button id="cancel-youtube-btn" hidden>ยกเลิกการแยกเสียง</button>
         <button class="primary" id="analyze-range-btn" disabled hidden>แกะใหม่จากเสียงที่โหลดแล้ว</button>
         <button id="preview-range-btn" disabled hidden>▶ ฟังช่วงที่เลือก</button>
         <button id="full-range-btn">เลือกทั้งเพลง</button>
@@ -254,8 +257,9 @@
     </div>
 
       <div class="panel" id="source-section" hidden>
-        <label for="original-audio">ฟังเสียงต้นฉบับเทียบกับแท็บ</label>
+        <label for="original-audio" id="audio-source-label">ฟังเสียงต้นฉบับเทียบกับแท็บ</label>
         <audio id="original-audio" controls preload="metadata"></audio>
+        <a id="guitar-audio-download" hidden style="color:var(--accent)">ดาวน์โหลดเสียงกีตาร์ .wav</a>
         <p class="note" id="source-name"></p>
       </div>
     <div id="result-section">

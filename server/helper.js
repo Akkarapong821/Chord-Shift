@@ -31,7 +31,7 @@ export function createHelperServer({ allowedOrigins = defaultOrigins, youtubeHan
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Expose-Headers', 'X-Video-Title, Content-Length');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Video-Title, Content-Length, X-Audio-Start, X-Audio-Isolation');
     }
     if (req.method === 'OPTIONS') {
       if (!origin || req.headers['access-control-request-method'] !== 'GET') {

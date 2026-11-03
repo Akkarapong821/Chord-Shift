@@ -9,7 +9,7 @@ import { downloadAudio } from './youtube-download.js';
 const fixture = Buffer.from('0000ftypM4A audio fixture');
 const videoUrl = 'https://www.youtube.com/watch?v=z164pDlYtOk&list=RDz164pDlYtOk&start_radio=1';
 const info = { basic_info: { title: 'สุขสันต์วันเลิกรา', duration: 281 }, playability_status: { status: 'OK' } };
-async function request(t, options = {}, url = videoUrl) {
+async function request(t, options = {}, url = videoUrl, suffix = '') {
   const server = createServer(createYouTubeHandler({
     getInnertube: async () => ({ getBasicInfo: async () => info }),
     download: async () => fixture,
@@ -18,8 +18,38 @@ async function request(t, options = {}, url = videoUrl) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => { server.closeAllConnections(); server.close(); });
-  return fetch(`http://127.0.0.1:${server.address().port}/?url=${encodeURIComponent(url)}`);
+  return fetch(`http://127.0.0.1:${server.address().port}/?url=${encodeURIComponent(url)}${suffix}`);
 }
+
+test('guitar mode separates the chosen clip and preserves its source timestamp', async (t) => {
+  const guitar = Buffer.from('RIFF0000WAVEguitar');
+  const response = await request(t, { separate: async (audio, range, signal) => {
+    assert.deepEqual(audio, fixture);
+    assert.deepEqual(range, { start: 85, end: 90 });
+    assert.equal(signal.aborted, false);
+    return guitar;
+  } }, videoUrl, '&isolate=guitar&start=85&end=90');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'audio/wav');
+  assert.equal(response.headers.get('x-audio-start'), '85');
+  assert.equal(response.headers.get('x-audio-isolation'), 'guitar');
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), guitar);
+});
+
+test('guitar mode rejects missing or excessive ranges before downloading', async (t) => {
+  for (const range of ['', '&start=-1&end=10', '&start=85&end=84', '&start=0&end=61', '&start=NaN&end=5']) {
+    const response = await request(t, { download: () => assert.fail('must not download') }, videoUrl, `&isolate=guitar${range}`);
+    assert.equal(response.status, 422);
+    assert.equal(await response.text(), 'guitar-range-invalid');
+  }
+});
+
+test('failed separation never silently substitutes the full mix', async (t) => {
+  const response = await request(t, { separate: async () => { throw Object.assign(new Error('missing'), { code: 'guitar-not-installed', status: 503 }); } }, videoUrl, '&isolate=guitar&start=85&end=90');
+  assert.equal(response.status, 503);
+  assert.match(response.headers.get('content-type'), /text\/plain/);
+  assert.equal(await response.text(), 'guitar-not-installed');
+});
 
 test('YouTube URLs select one video and reject lookalike domains', () => {
   assert.equal(extractVideoId(videoUrl), 'z164pDlYtOk');

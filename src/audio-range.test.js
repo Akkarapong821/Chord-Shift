@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAudioTime, readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime } from './audio-range.js';
+import { parseAudioTime, readAudioRange, formatAudioTime, cropAudioSamples, notesInOriginalTime, rangeForSource } from './audio-range.js';
+
+test('isolated clips keep original song time, allow refinements, and reject unavailable portions', () => {
+  assert.deepEqual(rangeForSource('1:25', '1:30', 5, 85), { start: 85, end: 90 });
+  assert.deepEqual(rangeForSource('1:26', '1:29', 5, 85), { start: 86, end: 89 });
+  assert.deepEqual(rangeForSource('1:25', '', 5, 85), { start: 85, end: 90 });
+  assert.throws(() => rangeForSource('1:20', '1:30', 5, 85));
+  assert.throws(() => rangeForSource('1:25', '1:31', 5, 85));
+  assert.throws(() => rangeForSource('1:30', '', 5, 85));
+});
 
 test('timestamps accept minutes:seconds, raw seconds and decimals', () => {
   assert.equal(parseAudioTime(' 1:25 '), 85);
