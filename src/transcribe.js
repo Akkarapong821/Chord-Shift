@@ -14,7 +14,7 @@ export async function decodeToModelRate(file, { channels = 1 } = {}) {
   }
 
   const length = Math.ceil(decoded.duration * MODEL_SAMPLE_RATE);
-  if (channels === 2 && decoded.numberOfChannels !== 2) throw new Error('ไฟล์แยกเสียงไม่มีแทร็กกีตาร์และกลองครบ — อัปเดตตัวช่วยแล้วดึงเพลงใหม่');
+  if (channels > 1 && decoded.numberOfChannels !== channels) throw new Error('ไฟล์แยกเสียงไม่มีแทร็กกีตาร์ กลอง และต้นฉบับครบ — อัปเดตตัวช่วยแล้วดึงเพลงใหม่');
   const offline = new OfflineAudioContext(channels, length, MODEL_SAMPLE_RATE);
   const source = offline.createBufferSource();
   source.buffer = decoded;

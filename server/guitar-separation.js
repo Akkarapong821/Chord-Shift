@@ -12,8 +12,8 @@ const fail = (code, status = 422) => Object.assign(new Error(code), { code, stat
 
 export function guitarRange(params) {
   const stems = params.get('stems');
-  if (stems !== null && stems !== 'guitar,drums') throw fail('guitar-stems-invalid');
-  const options = stems ? { stems: ['guitar', 'drums'] } : {};
+  if (stems !== null && stems !== 'guitar,drums' && stems !== 'guitar,drums,original') throw fail('guitar-stems-invalid');
+  const options = stems ? { stems: stems.split(',') } : {};
   if (params.get('full') === '1') return { start: 0, end: null, full: true, ...options };
   const start = Number(params.get('start') || 0);
   const endText = params.get('end');

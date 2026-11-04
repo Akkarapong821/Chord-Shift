@@ -22,6 +22,15 @@ test('guitar, drums and both produce distinct mixes while TAB always reads the o
   assert.deepEqual(audio.getChannelData(1), drums);
 });
 
+test('the original mix is its own channel and can be heard alone or with the stems', () => {
+  const channels = [[0.1, 0.2], [0.3, -0.1], [0.5, 0.4]].map(values => Float32Array.from(values));
+  const audio = { numberOfChannels: 3, sampleRate: 2, duration: 1, getChannelData: i => channels[i] };
+  assert.deepEqual(mixStemSamples(audio, { original: true }), channels[2]);
+  const withGuitar = mixStemSamples(audio, { guitar: true, original: true });
+  withGuitar.forEach((sample, i) => assert.ok(Math.abs(sample - channels[0][i] - channels[2][i]) < 1e-6));
+  assert.throws(() => mixStemSamples(stems(), { original: true }), /ไม่มีแทร็กที่เลือก/);
+});
+
 test('combined playback prevents clipping with a single gain and WAV exports have one channel', () => {
   const audio = stems([0.8, -0.8, 0.2], [0.8, -0.8, 0.2]);
   const samples = mixStemSamples(audio, { guitar: true, drums: true });

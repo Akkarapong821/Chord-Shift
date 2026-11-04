@@ -1,14 +1,16 @@
-// The transport WAV contains guitar on channel 0 and drums on channel 1.
-// Listening/export mixes are mono; transcription continues to read channel 0.
-export function mixStemSamples(audio, { guitar, drums }) {
-  if (!guitar && !drums) return null;
-  if (audio.numberOfChannels !== 2) throw new Error('ต้องมีเสียงกีตาร์และกลองครบสองแทร็ก');
-  const first = audio.getChannelData(0);
-  const second = audio.getChannelData(1);
-  const samples = new Float32Array(first.length);
+// The transport WAV carries one stem per channel, in this order: guitar, drums,
+// then the original mix. Listening/export mixes are mono; transcription reads channel 0.
+export const STEMS = ['guitar', 'drums', 'original'];
+
+export function mixStemSamples(audio, selection) {
+  const chosen = STEMS.map((name, channel) => selection[name] ? channel : -1).filter(channel => channel >= 0);
+  if (!chosen.length) return null;
+  if (chosen.some(channel => channel >= audio.numberOfChannels)) throw new Error('ไฟล์แยกเสียงไม่มีแทร็กที่เลือก — อัปเดตตัวช่วยแล้วดึงเพลงใหม่');
+  const channels = chosen.map(channel => audio.getChannelData(channel));
+  const samples = new Float32Array(channels[0].length);
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
-    samples[i] = (guitar ? first[i] : 0) + (drums ? second[i] : 0);
+    for (const data of channels) samples[i] += data[i];
     peak = Math.max(peak, Math.abs(samples[i]));
   }
   // Preserve the balance, applying one master gain only when the sum would clip.
@@ -61,14 +63,15 @@ export class StemPlayer {
   }
 
   select(selection) {
-    if (!this.buffer) throw new Error('ยังไม่ได้โหลดแทร็กกีตาร์และกลอง');
-    const key = `${+selection.guitar}${+selection.drums}`;
+    if (!this.buffer) throw new Error('ยังไม่ได้โหลดแทร็กที่แยกเสียง');
+    const key = STEMS.map(name => +!!selection[name]).join('');
     const position = this.restore?.position ?? this.audio.currentTime;
     const playing = this.restore?.playing ?? (!this.audio.paused && !this.audio.ended);
     this.detachMetadata();
     this.audio.pause();
-    this.restore = { position, playing: key === '00' ? false : playing };
-    if (key === '00') return null;
+    const silent = !key.includes('1');
+    this.restore = { position, playing: silent ? false : playing };
+    if (silent) return null;
     if (!this.outputs.has(key)) {
       const samples = mixStemSamples(this.buffer, selection);
       this.outputs.set(key, this.urls.createObjectURL(new Blob([encodeMonoWav(samples, this.buffer.sampleRate)], { type: 'audio/wav' })));

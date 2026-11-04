@@ -14,7 +14,8 @@ test('guitar and drums transport is explicit and invalid stem choices are reject
   assert.deepEqual(guitarRange(new URLSearchParams('full=1&stems=guitar,drums')), {
     start: 0, end: null, full: true, stems: ['guitar', 'drums'],
   });
-  for (const stems of ['drums', 'vocals', 'guitar,drums,vocals', '']) {
+  assert.deepEqual(guitarRange(new URLSearchParams('full=1&stems=guitar,drums,original')).stems, ['guitar', 'drums', 'original']);
+  for (const stems of ['drums', 'vocals', 'guitar,drums,vocals', 'original,guitar,drums', '']) {
     assert.throws(() => guitarRange(new URLSearchParams({ full: '1', stems })), { code: 'guitar-stems-invalid' });
   }
 });

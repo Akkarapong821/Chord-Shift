@@ -100,7 +100,7 @@ export function createYouTubeHandler({ getInnertube, download = downloadAudio, s
         if (range.stems) res.setHeader('X-Audio-Stems', range.stems.join(','));
         if (range.full) res.setHeader('X-Audio-Full-Song', '1');
       }
-      if (audio.length > (guitar ? (range.stems ? 96 : 64) * 1024 * 1024 : MAX_AUDIO_BYTES)) throw fail('audio-too-large', 413);
+      if (audio.length > (guitar ? (range.stems ? 48 * range.stems.length : 64) * 1024 * 1024 : MAX_AUDIO_BYTES)) throw fail('audio-too-large', 413);
       res.writeHead(200, {
         'Content-Type': guitar ? 'audio/wav' : 'audio/mp4',
         'Content-Length': audio.length,

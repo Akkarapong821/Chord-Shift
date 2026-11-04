@@ -1,4 +1,4 @@
-"""Local separation: guitar alone, or aligned guitar/drums transport channels."""
+"""Local separation: guitar alone, or aligned guitar/drums(/original) transport channels."""
 import argparse
 import os
 import hashlib
@@ -12,7 +12,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--prepare", action="store_true")
     parser.add_argument("--full", action="store_true")
-    parser.add_argument("--stems", choices=["guitar", "guitar,drums"], default="guitar")
+    parser.add_argument("--stems", choices=["guitar", "guitar,drums", "guitar,drums,original"], default="guitar")
     parser.add_argument("--input")
     parser.add_argument("--output")
     parser.add_argument("--start", type=float, default=0)
@@ -21,7 +21,7 @@ def main():
     cache_file = None
     if args.full and args.input and args.output:
         digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
-        cache_key = 'guitar' if args.stems == 'guitar' else 'guitar-drums'
+        cache_key = args.stems.replace(',', '-')
         cache_file = ROOT / '.tools' / 'guitar-cache' / f'{cache_key}-{digest}-v1.wav'
         if cache_file.is_file():
             shutil.copyfile(cache_file, args.output)
@@ -65,7 +65,8 @@ def main():
                               segment=5, progress=args.full)[0]
         channels = []
         for name in args.stems.split(','):
-            stem = sources[model.sources.index(name)] * deviation + mean
+            # The original mix shares the stems' timing and gain for side-by-side listening.
+            stem = wav if name == 'original' else sources[model.sources.index(name)] * deviation + mean
             channels.append(audio_functions.resample(stem.mean(0), model.samplerate, 22050))
         output = torch.stack(channels, dim=1)
     peak = output.abs().max().item()
