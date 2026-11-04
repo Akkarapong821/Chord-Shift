@@ -1,5 +1,18 @@
 # 🎸 Melody Tab + Chord Shift
 
+## Release 1.0.0
+
+ดาวน์โหลดจาก [GitHub Release v1.0.0](https://github.com/Akkarapong821/Chord-Shift/releases/tag/v1.0.0):
+
+- `Chord-Shift-1.0.0-windows-node.zip` — แพ็กเกจพร้อมเว็บที่ build แล้ว, source และตัวเปิดบน Windows ติดตั้ง **Node.js 22 ขึ้นไป**, แตก ZIP แล้วดับเบิลคลิก `start-youtube-helper.cmd` ครั้งแรกต้องใช้อินเทอร์เน็ตเพื่อติดตั้ง dependencies และ yt-dlp จากนั้นกด **Open website** ในหน้าต่างควบคุม
+- `Chord-Shift-1.0.0-web.zip` — เว็บ static พร้อมโมเดล Basic Pitch และ OCR สำหรับนำไปวางบน HTTP(S) hosting ต้องใช้ตัวช่วยแยกสำหรับ YouTube/แยกเสียง ไม่เปิดด้วย `file://`
+- `melody-tab-1.0.0.tgz` — แพ็กเกจ npm สำหรับแตกไฟล์ใช้งานเอง ไม่ได้เผยแพร่บน npm registry ภายในโฟลเดอร์ `package` รัน `npm install` แล้ว `npm start` เพื่อเปิดเว็บที่ `http://localhost:3000`
+- `SHA256SUMS.txt` — ค่า SHA-256 สำหรับตรวจสอบไฟล์ดาวน์โหลด เช่น `Get-FileHash .\Chord-Shift-1.0.0-windows-node.zip -Algorithm SHA256`
+
+แพ็กเกจไม่รวม Node.js, `node_modules`, yt-dlp, Python/FFmpeg/Demucs หรือ cache ส่วนตัว หากต้องการแยกกีตาร์/กลองให้รัน `npm run setup:guitar` เพิ่มเติม สำหรับการเปิด Node.js server จาก ZIP ใช้ `npm ci` แล้ว `npm start`
+
+สร้างแพ็กเกจซ้ำบน Windows ด้วย `npm ci` แล้ว `npm run package` คำสั่งจะทดสอบ, เตรียมโมเดล/OCR, build และสร้างไฟล์ใน `releases/` ดูรายละเอียดรุ่นใน [CHANGELOG.md](CHANGELOG.md)
+
 โปรเจกต์นี้มี 2 เครื่องมือ ทำงานในเบราว์เซอร์ทั้งหมด ฟรี ไม่ต้องใช้ API key:
 
 - **Melody Tab** (`/index.html?page=melody`): แปลงไฟล์เพลงเป็นแท็บกีตาร์ ใช้บนคอมพิวเตอร์เท่านั้น มือถือเปิดลิงก์นี้จะไป Chord Shift และไม่มีเมนู Melody Tab

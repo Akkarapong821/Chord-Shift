@@ -1,12 +1,30 @@
 {
   "name": "melody-tab",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "server/",
+    "scripts/",
+    "public/device-access.js",
+    "public/test-melody.wav",
+    "index.html",
+    "chords.html",
+    "vite.config.js",
+    "render.yaml",
+    "start-youtube-helper.cmd",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "postinstall": "node scripts/copy-model.mjs && node scripts/copy-tesseract.mjs",
     "dev": "vite",
     "build": "vite build",
+    "package": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1",
     "preview": "vite preview",
     "start": "node server/index.js",
     "helper": "node server/helper.js",
